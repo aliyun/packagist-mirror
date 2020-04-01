@@ -1,7 +1,6 @@
-package main
+package util
 
-func main() {
-
+func Execute() {
 	// Load config
 	loadConfig()
 
@@ -17,7 +16,7 @@ func main() {
 	// Update status
 	go status("Status", 1)
 
-	wg.Add(1)
+	Wg.Add(1)
 
 	for i := 0; i < 12; i++ {
 		go providers("Provider", i)
@@ -43,5 +42,4 @@ func main() {
 		go distsRetry(502, i)
 	}
 
-	wg.Wait()
 }
