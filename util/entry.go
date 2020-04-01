@@ -1,5 +1,6 @@
 package util
 
+// Execute the main processing logic
 func Execute() {
 	// Load config
 	loadConfig()

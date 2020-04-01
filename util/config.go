@@ -24,6 +24,7 @@ const (
 )
 
 var (
+	// Wg Concurrency control
 	Wg     sync.WaitGroup
 	config = new(Config)
 )
