@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"errors"
@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	wg     sync.WaitGroup
+	Wg     sync.WaitGroup
 	config = new(Config)
 )
 

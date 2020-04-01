@@ -22,3 +22,4 @@ ding.lock
 *.php
 packagist.yml
 Gopkg.lock
+go.sum
