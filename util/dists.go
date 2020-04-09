@@ -124,9 +124,5 @@ func uploadDist(jobJson string, name string, num int) {
 
 	makeSucceed(distsKey, path, getProcessName(name, num))
 
-	// Build Cache for CDN
-	fmt.Println(getProcessName(name, num), "Build Cache for CDN")
-	resp, _ = mirrorGet(path, getProcessName(name, num))
-	_ = resp.Body.Close()
-
+	cdnCache(path, getProcessName(name, num))
 }

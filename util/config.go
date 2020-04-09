@@ -21,6 +21,7 @@ const (
 	distsKey            = "mirror:dist"
 	distsNoMetaKey      = "mirror:dists:meta:missing"
 	packagesNoData      = "mirror:packages:nodata"
+	processingKey       = "mirror:queue:processing"
 )
 
 var (
