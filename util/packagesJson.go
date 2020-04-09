@@ -86,6 +86,8 @@ func packagesJsonFile(name string, num int) {
 			continue
 		}
 
+		time.Sleep(5 * time.Second)
+
 		// Update `packages.json`
 		packagesJson["last-update"] = time.Now().Format("2006-01-02 15:04:05")
 		packagesJson["providers-url"] = config.ProviderUrl + "p/%package%$%hash%.json"
