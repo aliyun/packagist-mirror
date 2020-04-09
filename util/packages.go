@@ -97,8 +97,8 @@ func packages(name string, num int) {
 
 		makeSucceed(packageHashFileKey, path, processName)
 
-		// Build Cache for DNS
-		fmt.Println(processName, "Build Cache for DNS")
+		// Build Cache for CDN
+		fmt.Println(processName, "Build Cache for CDN")
 		resp, _ = mirrorGet(path, processName)
 		_ = resp.Body.Close()
 
