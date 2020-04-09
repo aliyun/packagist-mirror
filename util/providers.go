@@ -99,8 +99,8 @@ func providers(name string, num int) {
 		// Mark succeed
 		makeSucceed(providerHashFileKey, path, getProcessName(name, num))
 
-		// Build Cache for DNS
-		fmt.Println(processName, "Build Cache for DNS")
+		// Build Cache for CDN
+		fmt.Println(processName, "Build Cache for CDN")
 		resp, _ = mirrorGet(path, getProcessName(name, num))
 		_ = resp.Body.Close()
 
