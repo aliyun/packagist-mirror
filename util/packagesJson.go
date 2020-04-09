@@ -73,11 +73,12 @@ func packagesJsonFile(name string, num int) {
 		dispatchProviders(packagesJson["provider-includes"], processName)
 
 		for {
+			left := lLen(processingKey)
 			// If all tasks are completed, skip the loop and update the file
-			if queueExists(providerHashFileKey) == 0 && queueExists(packageHashFileKey) == 0 && queueExists(distsKey) == 0 {
+			if queueExists(providerHashFileKey) == 0 && queueExists(packageHashFileKey) == 0 && queueExists(distsKey) == 0 && left == 0 {
 				break
 			}
-			fmt.Println(processName, "Synchronization task is not completed, check again in 1 second.")
+			fmt.Println(processName, "Processing: ", left, " Check again in 1 second. ")
 			time.Sleep(1 * time.Second)
 		}
 
@@ -125,6 +126,7 @@ func dispatchProviders(distMap interface{}, processName string) {
 			}
 
 			pushProviderToQueue(path, processName)
+			addIntoProcessing(path)
 		}
 
 	}

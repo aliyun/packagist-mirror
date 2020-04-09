@@ -50,6 +50,7 @@ func isSucceed(key string, field string) bool {
 }
 
 func makeSucceed(key string, field string, processName string) {
+	removeFromProcessing(field)
 	queue := key + ":succeed"
 	redisClient.HSet(queue, field, getDateTime())
 	removeStatusCodeFailed(key, field, 403)
@@ -169,4 +170,13 @@ func addIntoQueue(key string, content string) {
 	key += ":queued"
 	redisClient.HSet(key, content, getDateTime())
 	redisClient.Expire(key, 100*time.Second)
+}
+
+func addIntoProcessing(path string) {
+	redisClient.HSet(processingKey, path, getDateTime())
+	redisClient.Expire(processingKey, 70*time.Second)
+}
+
+func removeFromProcessing(path string) {
+	redisClient.HDel(processingKey, path)
 }

@@ -17,8 +17,25 @@ func packagistGet(url string, processName string) (*http.Response, error) {
 	return getJSON(packagistUrl(url), processName)
 }
 
-func mirrorGet(path string, processName string) (*http.Response, error) {
-	return get(mirrorUrl(path), processName)
+func cdnCache(url string, processName string) {
+	url = mirrorUrl(url)
+	fmt.Println(processName, "Cache Building", url)
+	client := http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	resp, err := client.Do(req)
+
+	if err != nil {
+		fmt.Println(processName, "Cache Error", err.Error())
+		return
+	}
+
+	if resp.StatusCode == 200 {
+		fmt.Println(processName, "Cache Build", url)
+	} else if resp.StatusCode != 200 {
+		fmt.Println(processName, "Cache Error", resp.StatusCode, url)
+	}
+
+	resp.Body.Close()
 }
 
 func getJSON(url string, processName string) (*http.Response, error) {

@@ -14,8 +14,6 @@ yarn-error.log
 .idea
 .DS_Store
 /logs/*
-main/main
-main/composerPhar
 vendor
 ding.lock
 /composer.json

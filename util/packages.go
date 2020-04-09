@@ -97,10 +97,7 @@ func packages(name string, num int) {
 
 		makeSucceed(packageHashFileKey, path, processName)
 
-		// Build Cache for CDN
-		fmt.Println(processName, "Build Cache for CDN")
-		resp, _ = mirrorGet(path, processName)
-		_ = resp.Body.Close()
+		cdnCache(path, processName)
 
 	}
 
@@ -184,6 +181,7 @@ func dispatchDists(packages interface{}, processName string, path string) {
 				}
 
 				pushDistToQueue(string(jsonString), path, distName, processName)
+				addIntoProcessing(path)
 
 			}
 
