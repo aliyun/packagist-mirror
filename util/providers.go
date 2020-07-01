@@ -11,43 +11,55 @@ import (
 
 func providers(name string, num int) {
 
-	processName := getProcessName(name, num)
-
 	for {
-		// BLPOP
-		job, err := popFromQueue(providerHashFileKey)
-		if err != nil {
+
+		jobJson := sPop(providerQueue)
+		if jobJson == "" {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		path := job[1]
-
-		removeFromQueue(providerHashFileKey, path, processName)
-
-		// Redis IsObjectExist
-		if isSucceed(providerHashFileKey, path) {
-			fmt.Println(processName, "Processed", path)
+		jobMap := make(map[string]string)
+		err := json.Unmarshal([]byte(jobJson), &jobMap)
+		if err != nil {
+			sAdd(providerSet+"-json_decode_error", jobJson)
 			continue
 		}
 
-		resp, err := packagistGet(path, processName)
+		path, ok := jobMap["path"]
+		if !ok {
+			fmt.Println(getProcessName(name, num), "provider field not found: path")
+			continue
+		}
+
+		hash, ok := jobMap["hash"]
+		if !ok {
+			fmt.Println(getProcessName(name, num), "provider field not found: hash")
+			continue
+		}
+
+		key, ok := jobMap["key"]
+		if !ok {
+			fmt.Println(getProcessName(name, num), "provider field not found: key")
+			continue
+		}
+
+		resp, err := packagistGet(path, getProcessName(name, num))
 		if err != nil {
 			syncHasError = true
-			fmt.Println(processName, path, err.Error())
-			makeFailed(providerHashFileKey, path, err.Error())
+			fmt.Println(getProcessName(name, num), path, err.Error())
+			makeFailed(providerSet, path)
 			continue
 		}
 
 		if resp.StatusCode != 200 {
 			syncHasError = true
-
 			// Make failed count
-			makeStatusCodeFailed(providerHashFileKey, resp.StatusCode, path, packagistUrl(path))
+			makeStatusCodeFailed(providerSet, resp.StatusCode, path)
 
 			// Push into failed queue to retry
 			if resp.StatusCode != 404 && resp.StatusCode != 410 {
-				pushToQueueForStatusCodeRetry(providerHashFileKey, resp.StatusCode, path)
+				pushProvider(key, path, hash, getProcessName(name, num))
 			}
 
 			continue
@@ -57,7 +69,7 @@ func providers(name string, num int) {
 		_ = resp.Body.Close()
 		if err != nil {
 			syncHasError = true
-			fmt.Println(processName, path, err.Error())
+			fmt.Println(getProcessName(name, num), path, err.Error())
 			continue
 		}
 
@@ -68,8 +80,8 @@ func providers(name string, num int) {
 			continue
 		}
 
-		if !CheckHash(processName, path, content) {
-			pushProviderToQueue(path, processName)
+		if !CheckHash(getProcessName(name, num), hash, content) {
+			pushProvider(key, path, hash, getProcessName(name, num))
 			continue
 		}
 
@@ -77,7 +89,7 @@ func providers(name string, num int) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		err = putObject(processName, path, bytes.NewReader(content), options...)
+		err = putObject(getProcessName(name, num), path, bytes.NewReader(content), options...)
 		if err != nil {
 			syncHasError = true
 			fmt.Println("putObject Error", err.Error())
@@ -89,47 +101,62 @@ func providers(name string, num int) {
 		err = json.Unmarshal(content, &distMap)
 		if err != nil {
 			syncHasError = true
-			fmt.Println(processName, path, err.Error())
+			fmt.Println(getProcessName(name, num), path, err.Error())
 			errHandler(err)
 			continue
 		}
 
-		dispatchPackages(distMap["providers"], getProcessName(name, num))
+		hSet(providerSet, key, hash)
 
-		// Mark succeed
-		makeSucceed(providerHashFileKey, path, getProcessName(name, num))
+		dispatchPackages(distMap["providers"])
 
-		cdnCache(path, getProcessName(name, num))
-
+		cdnCache(path, name, num)
 	}
 
 }
 
-func dispatchPackages(distMap interface{}, processName string) {
+func dispatchPackages(distMap interface{}) {
 	for packageName, value := range distMap.(map[string]interface{}) {
 
 		for _, hash := range value.(map[string]interface{}) {
 
-			path := "p/" + packageName + "$" + hash.(string) + ".json"
+			sha256 := hash.(string)
 
-			if isSucceed(packageHashFileKey, path) {
-				fmt.Println(processName, "Succeed", mirrorUrl(path))
-				continue
+			// Support Composer 1.X
+			if !hashHGet(packageP1Set, packageName, sha256) {
+				p1 := make(map[string]interface{})
+				p1["key"] = packageName
+				p1["path"] = "p/" + packageName + "$" + sha256 + ".json"
+				p1["hash"] = sha256
+				jsonP1, _ := json.Marshal(p1)
+				sAdd(packageP1Queue, string(jsonP1))
+				countToday(packageP1Set, packageName)
 			}
 
-			pushPackageToQueue(path, processName)
-			addIntoProcessing(path)
-			count(packageKey, packageName)
+			// Support Composer 2.0
+			key := "p2/" + packageName + ".json"
+			if !hashHGet(packageP2Set, key, sha256) {
+				p2 := make(map[string]interface{})
+				p2["key"] = key
+				p2["path"] = key
+				p2["hash"] = sha256
+				jsonP2, _ := json.Marshal(p2)
+				sAdd(packageP2Queue, string(jsonP2))
+			}
+
+			// Support Composer 2.0 ~dev.json
+			keyDev := "p2/" + packageName + "~dev.json"
+			if !hashHGet(packageP2DevSet, keyDev, sha256) {
+				p2dev := make(map[string]interface{})
+				p2dev["key"] = keyDev
+				p2dev["path"] = keyDev
+				p2dev["hash"] = sha256
+				jsonP2dev, _ := json.Marshal(p2dev)
+				sAdd(packageP2DevQueue, string(jsonP2dev))
+			}
 
 		}
 
 	}
 
-}
-
-func pushPackageToQueue(path string, processName string) {
-	if pushToQueue(packageHashFileKey, path, processName) {
-
-		count(packageHashFileKey, path)
-	}
 }

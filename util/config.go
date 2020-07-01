@@ -3,25 +3,33 @@ package util
 import (
 	"errors"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
-
-	"gopkg.in/yaml.v2"
 )
 
 const (
-	providerKey         = "mirror:providers"
-	versionsKey         = "mirror:versions"
-	packageKey          = "mirror:packages"
-	providerHashFileKey = "mirror:providerHashFile"
-	packageHashFileKey  = "mirror:packageHashFile"
-	distsKey            = "mirror:dist"
-	distsNoMetaKey      = "mirror:dists:meta:missing"
-	packagesNoData      = "mirror:packages:nodata"
-	processingKey       = "mirror:queue:processing"
+	packagesJsonKey = "set:packages.json"
+	packagesNoData  = "set:packages-nodata"
+	distsNoMetaKey  = "set:dists-meta-missing"
+
+	distSet          = "set:dists"
+	providerSet      = "set:providers"
+	packageP1Set     = "set:packagesP1"
+	packageP1SetHash = "set:packagesP1-Hash"
+	packageP2Set     = "set:packagesP2"
+	packageP2DevSet  = "set:packagesP2-Dev"
+	versionsSet      = "set:versions"
+
+	distQueue         = "queue:dists"
+	distQueueRetry    = "queue:dists-Retry"
+	providerQueue     = "queue:providers"
+	packageP1Queue    = "queue:packagesP1"
+	packageP2Queue    = "queue:packagesP2"
+	packageP2DevQueue = "queue:packagesP2-Dev"
 )
 
 var (
