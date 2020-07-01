@@ -17,15 +17,16 @@ func packagistGet(url string, processName string) (*http.Response, error) {
 	return getJSON(packagistUrl(url), processName)
 }
 
-func cdnCache(url string, processName string) {
+func cdnCache(url string, name string, num int) {
+	processName := getProcessName(name, num)
 	url = mirrorUrl(url)
-	fmt.Println(processName, "Cache Building", url)
 	client := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	resp, err := client.Do(req)
 
 	if err != nil {
 		fmt.Println(processName, "Cache Error", err.Error())
+		resp.Body.Close()
 		return
 	}
 
@@ -39,7 +40,6 @@ func cdnCache(url string, processName string) {
 }
 
 func getJSON(url string, processName string) (*http.Response, error) {
-	fmt.Println(processName, "Get Downloading", url)
 	client := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Add("User-Agent", "Alibaba")
@@ -49,8 +49,6 @@ func getJSON(url string, processName string) (*http.Response, error) {
 
 	if err != nil {
 		fmt.Println(processName, "Get Error", err.Error())
-	} else if resp.StatusCode == 200 {
-		fmt.Println(processName, "Get Downloaded", url)
 	} else if resp.StatusCode != 200 {
 		fmt.Println(processName, "Get Error", resp.StatusCode, url)
 	}
@@ -59,15 +57,12 @@ func getJSON(url string, processName string) (*http.Response, error) {
 }
 
 func get(url string, processName string) (*http.Response, error) {
-	fmt.Println(processName, "Get Downloading", url)
 	client := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	resp, err := client.Do(req)
 
 	if err != nil {
 		fmt.Println(processName, "Get Error", err.Error())
-	} else if resp.StatusCode == 200 {
-		fmt.Println(processName, "Get Downloaded", url)
 	} else if resp.StatusCode != 200 {
 		fmt.Println(processName, "Get Error", resp.StatusCode, url)
 	}

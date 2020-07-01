@@ -9,33 +9,47 @@ import (
 	"time"
 )
 
-func packages(name string, num int) {
-
-	processName := getProcessName(name, num)
+func packagesP1(name string, num int) {
 
 	for {
-		// BLPOP
-		job, err := popFromQueue(packageHashFileKey)
-		if err != nil {
+		jobJson := sPop(packageP1Queue)
+		if jobJson == "" {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		path := job[1]
-
-		removeFromQueue(packageHashFileKey, path, processName)
-
-		// Redis IsObjectExist
-		if isSucceed(packageHashFileKey, path) {
-			fmt.Println(processName, "Processed", path)
+		// Json decode
+		JobMap := make(map[string]string)
+		err := json.Unmarshal([]byte(jobJson), &JobMap)
+		if err != nil {
+			fmt.Println(getProcessName(name, num), "JSON Decode Error:", jobJson)
+			sAdd(packageP1Set+"-json_decode_error", jobJson)
 			continue
 		}
 
-		resp, err := packagistGet(path, processName)
+		path, ok := JobMap["path"]
+		if !ok {
+			fmt.Println(getProcessName(name, num), "package field not found: path")
+			continue
+		}
+
+		hash, ok := JobMap["hash"]
+		if !ok {
+			fmt.Println(getProcessName(name, num), "package field not found: hash")
+			continue
+		}
+
+		key, ok := JobMap["key"]
+		if !ok {
+			fmt.Println(getProcessName(name, num), "package field not found: key")
+			continue
+		}
+
+		resp, err := packagistGet(path, getProcessName(name, num))
 		if err != nil {
 			syncHasError = true
-			fmt.Println(processName, path, err.Error())
-			makeFailed(packageHashFileKey, path, err.Error())
+			fmt.Println(getProcessName(name, num), path, err.Error())
+			makeFailed(packageP1Set, path)
 			continue
 		}
 
@@ -43,11 +57,11 @@ func packages(name string, num int) {
 			syncHasError = true
 
 			// Make failed count
-			makeStatusCodeFailed(packageHashFileKey, resp.StatusCode, path, packagistUrl(path))
+			makeStatusCodeFailed(packageP1Set, resp.StatusCode, path)
 
 			// Push into failed queue to retry
 			if resp.StatusCode != 404 && resp.StatusCode != 410 {
-				pushToQueueForStatusCodeRetry(packageHashFileKey, resp.StatusCode, path)
+				sAdd(packageP1Queue, jobJson)
 			}
 
 			continue
@@ -57,7 +71,7 @@ func packages(name string, num int) {
 		_ = resp.Body.Close()
 		if err != nil {
 			syncHasError = true
-			fmt.Println(processName, path, err.Error())
+			fmt.Println(getProcessName(name, num), path, err.Error())
 			continue
 		}
 
@@ -68,8 +82,8 @@ func packages(name string, num int) {
 			continue
 		}
 
-		if !CheckHash(processName, path, content) {
-			pushPackageToQueue(path, processName)
+		if !CheckHash(getProcessName(name, num), hash, content) {
+			syncHasError = true
 			continue
 		}
 
@@ -77,7 +91,7 @@ func packages(name string, num int) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		err = putObject(processName, path, bytes.NewReader(content), options...)
+		err = putObject(getProcessName(name, num), path, bytes.NewReader(content), options...)
 		if err != nil {
 			syncHasError = true
 			fmt.Println("putObject Error", err.Error())
@@ -89,16 +103,14 @@ func packages(name string, num int) {
 		err = json.Unmarshal(content, &distMap)
 		if err != nil {
 			syncHasError = true
-			fmt.Println(processName, path, "Error parsing JSON", err.Error())
+			fmt.Println(getProcessName(name, num), path, "Error parsing JSON", err.Error())
 			continue
 		}
 
-		dispatchDists(distMap["packages"], processName, packagistUrl(path))
-
-		makeSucceed(packageHashFileKey, path, processName)
-
-		cdnCache(path, processName)
-
+		hSet(packageP1Set, key, hash)
+		dispatchDists(distMap["packages"], getProcessName(name, num), packagistUrl(path))
+		cdnCache(path, name, num)
+		countToday(packageP1SetHash, path)
 	}
 
 }
@@ -107,7 +119,7 @@ func dispatchDists(packages interface{}, processName string, path string) {
 
 	list, ok := packages.(map[string]interface{})
 	if !ok {
-		count(packagesNoData, path)
+		countAll(packagesNoData, path)
 		return
 	}
 
@@ -124,64 +136,57 @@ func dispatchDists(packages interface{}, processName string, path string) {
 
 				distContent, ok := dist.(map[string]interface{})
 				if !ok {
-					redisClient.HSet(distsNoMetaKey, distName, path)
+					sAdd(distsNoMetaKey, path)
 					continue
 				}
 
 				if v, ok := distContent["type"]; !ok {
 					fmt.Println(processName, "type does not exist")
-					redisClient.HSet(distsNoMetaKey, distName, path)
+					sAdd(distsNoMetaKey, path)
 
 					continue
 				} else if v == nil {
 					fmt.Println(processName, "type is empty")
-					redisClient.HSet(distsNoMetaKey, distName, path)
+					sAdd(distsNoMetaKey, path)
 
 					continue
 				}
 
 				if v, ok := distContent["url"]; !ok {
 					fmt.Println(processName, "url does not exist")
-					redisClient.HSet(distsNoMetaKey, distName, path)
+					sAdd(distsNoMetaKey, path)
 
 					continue
 				} else if v == nil {
 					fmt.Println(processName, "url is empty")
-					redisClient.HSet(distsNoMetaKey, distName, path)
+					sAdd(distsNoMetaKey, path)
 
 					continue
 				}
 
 				if v, ok := distContent["reference"]; !ok {
 					fmt.Println(processName, "reference does not exist")
-					redisClient.HSet(distsNoMetaKey, distName, path)
+					sAdd(distsNoMetaKey, path)
 
 					continue
 				} else if v == nil {
 					fmt.Println(processName, "reference is empty")
-					redisClient.HSet(distsNoMetaKey, distName, path)
+					sAdd(distsNoMetaKey, path)
 
 					continue
 				}
-
-				distJob := make(map[string]interface{})
 
 				path := "dists/" + packageName + "/" + distContent["reference"].(string) + "." + distContent["type"].(string)
 
-				distJob["path"] = path
-				distJob["url"] = distContent["url"]
-				distJob["reference"] = distContent["reference"]
-				distJob["package"] = packageName
-				distJob["version"] = version
-				jsonString, _ := json.Marshal(distJob)
-
-				if isSucceed(distsKey, path) {
-					fmt.Println(processName, "Succeed", mirrorUrl(path))
-					continue
+				if !sIsMember(distSet, path) {
+					distJob := make(map[string]interface{})
+					distJob["path"] = path
+					distJob["url"] = distContent["url"]
+					jsonString, _ := json.Marshal(distJob)
+					sAdd(distQueue, string(jsonString))
+					countAll(versionsSet, distName)
+					countToday(versionsSet, distName)
 				}
-
-				pushDistToQueue(string(jsonString), path, distName, processName)
-				addIntoProcessing(path)
 
 			}
 
@@ -189,11 +194,4 @@ func dispatchDists(packages interface{}, processName string, path string) {
 
 	}
 
-}
-
-func pushDistToQueue(jsonString string, path string, distName string, processName string) {
-	if pushToQueue(distsKey, jsonString, processName) {
-		count(distsKey, path)
-		count(versionsKey, distName)
-	}
 }

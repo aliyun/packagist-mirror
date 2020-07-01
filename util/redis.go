@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"github.com/go-redis/redis"
 	"strconv"
 	"time"
@@ -17,9 +16,12 @@ func initRedisClient() {
 	})
 }
 
-func count(key, field string) {
-	redisClient.HSet(key, field, getDateTime())
-	redisClient.HSet(getTodayKey(key), field, getDateTime())
+func countAll(key, member string) {
+	sAdd(key, member)
+}
+
+func countToday(key, member string) {
+	sAdd(getTodayKey(key), member)
 	redisClient.ExpireAt(getTodayKey(key), getTomorrow())
 }
 
@@ -30,106 +32,55 @@ func getTomorrow() time.Time {
 }
 
 func getTodayKey(key string) string {
-	return key + ":" + time.Now().Format("2006-01-02")
+	return key + "-" + time.Now().Format("2006-01-02")
 }
 
-func hExists(key, field string) bool {
-	exist, err := redisClient.HExists(key, field).Result()
+func sAdd(key string, member string) {
+	redisClient.SAdd(key, member).Result()
+}
+
+func sRem(key string, member string) {
+	redisClient.SRem(key, member).Result()
+}
+
+func sPop(key string) string {
+	value, err := redisClient.SPop(key).Result()
 	if err != nil {
-		fmt.Println(err.Error())
+		return ""
 	}
-	if exist {
-		return true
-	}
-	return false
+
+	return value
 }
 
-func isSucceed(key string, field string) bool {
-	key += ":succeed"
-	return hExists(key, field)
-}
-
-func makeSucceed(key string, field string, processName string) {
-	removeFromProcessing(field)
-	queue := key + ":succeed"
-	redisClient.HSet(queue, field, getDateTime())
-	removeStatusCodeFailed(key, field, 403)
-	removeStatusCodeFailed(key, field, 404)
-	removeStatusCodeFailed(key, field, 410)
-	removeStatusCodeFailed(key, field, 500)
-	removeStatusCodeFailed(key, field, 502)
-	removeFailed(key, field)
-	removeFromQueue(key, field, processName)
-}
-
-func getSucceedNum(key string) int64 {
-	key += ":succeed"
-	return lLen(key)
-}
-
-func makeFailed(key string, field string, content string) {
-	key += ":failed"
-	redisClient.HSet(key, field, content)
-}
-
-func removeFailed(key string, field string) {
-	key += ":failed"
-	redisClient.HDel(key, field)
-}
-
-func getFailedNum(key string) int64 {
-	key += ":failed"
-	return lLen(key)
-}
-
-func makeStatusCodeFailed(key string, statusCode int, field string, content string) {
-	key += ":" + strconv.Itoa(statusCode)
-	redisClient.HSet(key, field, content)
-}
-
-func removeStatusCodeFailed(key string, field string, statusCode int) {
-	key += ":" + strconv.Itoa(statusCode)
-	redisClient.HDel(key, field)
-}
-
-func getStatusCodedFailedNum(key string, statusCode int) int64 {
-	key += ":" + strconv.Itoa(statusCode)
-	return lLen(key)
-}
-
-func pushToQueue(key string, content string, processName string) bool {
-	if isInQueue(key, content, processName) {
+func sIsMember(key string, member string) bool {
+	exist, err := redisClient.SIsMember(key, member).Result()
+	if err != nil {
 		return false
 	}
-
-	queueKey := key + ":queue"
-	addIntoQueue(key, content)
-	redisClient.LPush(queueKey, content)
-	return true
+	return exist
 }
 
-func popFromQueue(key string) ([]string, error) {
-	timeout := 1 * time.Second
-	key += ":queue"
-	return redisClient.BRPop(timeout, key).Result()
-}
-
-func popFromQueueStatusCode(key string, statusCode int) ([]string, error) {
-	timeout := 1 * time.Second
-	key += ":queue:" + strconv.Itoa(statusCode)
-	return redisClient.BRPop(timeout, key).Result()
-}
-
-func getQueueNum(key string) int64 {
-	key += ":queue"
-	num, err := redisClient.LLen(key).Result()
+func sCard(key string) int64 {
+	num, err := redisClient.SCard(key).Result()
 	if err != nil {
 		num = 0
 	}
 	return num
 }
 
-func lLen(key string) int64 {
+func hSet(key string, field string, content string) {
+	redisClient.HSet(key, field, content)
+}
+
+func hGet(key, field string) string {
+	value, err := redisClient.HGet(key, field).Result()
+	if err != nil {
+		//fmt.Println(key, err.Error())
+	}
+	return value
+}
+
+func hLen(key string) int64 {
 	num, err := redisClient.HLen(key).Result()
 	if err != nil {
 		num = 0
@@ -137,46 +88,46 @@ func lLen(key string) int64 {
 	return num
 }
 
-func queueExists(key string) int64 {
-	key += ":queue"
-	num, err := redisClient.Exists(key).Result()
-	if err != nil {
-		num = 0
-	}
-	return num
+func hashHGet(key string, field string, hash string) bool {
+	return hGet(key, field) == hash
 }
 
-func pushToQueueForStatusCodeRetry(key string, statusCode int, content string) {
-	key += ":queue:" + strconv.Itoa(statusCode)
-	redisClient.LPush(key, content)
+func makeSucceed(key string, field string) {
+	sAdd(key, field)
+	removeStatusCodeFailed(key, field, 403)
+	removeStatusCodeFailed(key, field, 404)
+	removeStatusCodeFailed(key, field, 410)
+	removeStatusCodeFailed(key, field, 500)
+	removeStatusCodeFailed(key, field, 502)
+	removeFailed(key, field)
 }
 
-func isInQueue(key string, hashKey string, processName string) bool {
-	key += ":queued"
-	if hExists(key, hashKey) {
-		fmt.Println(processName, "Queued", key, mirrorUrl(hashKey))
-		return true
-	}
-	return false
+func makeFailed(key string, field string) {
+	key += "-failed"
+	sAdd(key, field)
 }
 
-func removeFromQueue(key string, content string, processName string) {
-	key += ":queued"
-	fmt.Println(processName, "Queued Remove", key, content)
-	redisClient.HDel(key, content)
+func removeFailed(key string, field string) {
+	key += "-failed"
+	sRem(key, field)
 }
 
-func addIntoQueue(key string, content string) {
-	key += ":queued"
-	redisClient.HSet(key, content, getDateTime())
-	redisClient.Expire(key, 100*time.Second)
+func countFailed(key string) int64 {
+	key += "-failed"
+	return sCard(key)
 }
 
-func addIntoProcessing(path string) {
-	redisClient.HSet(processingKey, path, getDateTime())
-	redisClient.Expire(processingKey, 70*time.Second)
+func makeStatusCodeFailed(key string, statusCode int, field string) {
+	key += "-" + strconv.Itoa(statusCode)
+	sAdd(key, field)
 }
 
-func removeFromProcessing(path string) {
-	redisClient.HDel(processingKey, path)
+func removeStatusCodeFailed(key string, field string, statusCode int) {
+	key += "-" + strconv.Itoa(statusCode)
+	sRem(key, field)
+}
+
+func countStatusCodedFailed(key string, statusCode int) int64 {
+	key += "-" + strconv.Itoa(statusCode)
+	return sCard(key)
 }

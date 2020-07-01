@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
-	"strings"
 )
 
 func getProcessName(name string, num int) string {
@@ -17,26 +16,17 @@ func errHandler(err error) {
 	panic(err.Error())
 }
 
-// GetHashFromPath Get Hash from File path
-func GetHashFromPath(path string) string {
-	str := strings.Split(path, "$")
-	hash := strings.TrimSuffix(str[1], ".json")
-	return hash
-}
-
 // CheckHash Check Hash for File
-func CheckHash(process string, path string, content []byte) bool {
-	hash := GetHashFromPath(path)
-
-	fmt.Println(process, "Original Hash", hash)
+func CheckHash(processName string, hash string, content []byte) bool {
 
 	sh := sha256.New()
 	sh.Write(content)
 	sum := hex.EncodeToString(sh.Sum(nil))
 
 	if hash != sum {
-		fmt.Println(process, "Wrong Hash", path, sum)
+		fmt.Println(processName, "Wrong Hash", "Original:", hash, "Current:", sum)
+		return false
 	}
 
-	return hash == sum
+	return true
 }

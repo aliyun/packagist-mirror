@@ -9,6 +9,9 @@ import (
 )
 
 func status(name string, processNum int) {
+
+	processName := getProcessName(name, processNum)
+
 	for {
 		time.Sleep(1 * time.Second)
 
@@ -57,34 +60,35 @@ func status(name string, processNum int) {
 
 		// Queue
 		Content["Queue"] = map[string]interface{}{
-			"Dists":     getQueueNum(distsKey),
-			"Packages":  getQueueNum(packageHashFileKey),
-			"Providers": getQueueNum(providerHashFileKey),
+			"Providers":  sCard(providerQueue),
+			"Packages":   sCard(packageP1Queue) + sCard(packageP2Queue),
+			"Dists":      sCard(distQueue),
+			"DistsRetry": sCard(distQueueRetry),
 		}
 
 		// Statistics
 		Content["Statistics"] = map[string]interface{}{
-			"Dists_Available":             getSucceedNum(distsKey),
-			"Dists_Failed":                getFailedNum(distsKey),
-			"Dists_Forbidden":             getStatusCodedFailedNum(distsKey, 403),
-			"Dists_Gone":                  getStatusCodedFailedNum(distsKey, 410),
-			"Dists_Meta_Missing":          lLen(distsNoMetaKey),
-			"Dists_Not_Found":             getStatusCodedFailedNum(distsKey, 404),
-			"Dists_Internal_Server_Error": getStatusCodedFailedNum(distsKey, 500),
-			"Dists_Bad_Gateway":           getStatusCodedFailedNum(distsKey, 502),
-			"Packages":                    lLen(packageKey),
-			"Packages_No_Data":            lLen(packagesNoData),
-			"Providers":                   lLen(providerKey),
-			"Versions":                    lLen(versionsKey),
+			"Dists_Available":             sCard(distSet),
+			"Dists_Failed":                countFailed(distSet),
+			"Dists_Forbidden":             countStatusCodedFailed(distSet, 403),
+			"Dists_Gone":                  countStatusCodedFailed(distSet, 410),
+			"Dists_Meta_Missing":          sCard(distsNoMetaKey),
+			"Dists_Not_Found":             countStatusCodedFailed(distSet, 404),
+			"Dists_Internal_Server_Error": countStatusCodedFailed(distSet, 500),
+			"Dists_Bad_Gateway":           countStatusCodedFailed(distSet, 502),
+			"Packages":                    hLen(packageP1Set),
+			"Packages_No_Data":            sCard(packagesNoData),
+			"Providers":                   hLen(providerSet),
+			"Versions":                    sCard(versionsSet),
 		}
 
 		// Today Updated
 		Content["Today_Updated"] = map[string]interface{}{
-			"Dists":             lLen(getTodayKey(distsKey)),
-			"Packages":          lLen(getTodayKey(packageKey)),
-			"PackagesHashFile":  lLen(getTodayKey(packageHashFileKey)),
-			"ProvidersHashFile": lLen(getTodayKey(providerHashFileKey)),
-			"Versions":          lLen(getTodayKey(versionsKey)),
+			"Dists":             sCard(getTodayKey(distSet)),
+			"Packages":          sCard(getTodayKey(packageP1Set)),
+			"PackagesHashFile":  sCard(getTodayKey(packageP1SetHash)),
+			"ProvidersHashFile": sCard(getTodayKey(providerSet)),
+			"Versions":          sCard(getTodayKey(versionsSet)),
 		}
 
 		status["Content"] = Content
@@ -96,7 +100,7 @@ func status(name string, processNum int) {
 			oss.ContentType("application/json"),
 		}
 
-		_ = putObject(getProcessName(name, processNum), "status.json", bytes.NewReader(statusResult), options...)
+		_ = putObject(processName, "status.json", bytes.NewReader(statusResult), options...)
 
 	}
 

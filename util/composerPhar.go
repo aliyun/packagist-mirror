@@ -21,15 +21,13 @@ type stable struct {
 
 func composerPhar(name string, num int) {
 
-	processName := getProcessName(name, num)
-
 	for {
 		// Sleep
 		time.Sleep(1 * time.Second)
 
 		// Get latest stable version
 		versionUrl := "https://getcomposer.org/versions"
-		resp, err := get(versionUrl, processName)
+		resp, err := get(versionUrl, getProcessName(name, num))
 		if err != nil {
 			continue
 		}
@@ -41,12 +39,12 @@ func composerPhar(name string, num int) {
 		content, err := ioutil.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			fmt.Println(processName, versionUrl, err.Error())
+			fmt.Println(getProcessName(name, num), versionUrl, err.Error())
 			continue
 		}
 
 		if bytes.Equal(versionsCache, content) {
-			fmt.Println(processName, "Update to date:", versionUrl)
+			fmt.Println(getProcessName(name, num), "Update to date:", versionUrl)
 			continue
 		}
 		versionsCache = content
@@ -55,7 +53,7 @@ func composerPhar(name string, num int) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		_ = putObject(processName, "versions", bytes.NewReader(content), options...)
+		_ = putObject(getProcessName(name, num), "versions", bytes.NewReader(content), options...)
 
 		// JSON Decode
 		err = json.Unmarshal(content, &versions)
@@ -65,7 +63,7 @@ func composerPhar(name string, num int) {
 		}
 
 		// Like https://getcomposer.org/download/1.9.1/composer.phar
-		phar, err := get("https://getcomposer.org"+versions["stable"][0].Path, processName)
+		phar, err := get("https://getcomposer.org"+versions["stable"][0].Path, getProcessName(name, num))
 		if err != nil {
 			continue
 		}
@@ -75,8 +73,8 @@ func composerPhar(name string, num int) {
 		}
 
 		composerPhar, err := ioutil.ReadAll(phar.Body)
-		_ = putObject(processName, "composer.phar", bytes.NewReader(composerPhar))
-		_ = putObject(processName, "download/"+versions["stable"][0].Version+"/composer.phar", bytes.NewReader(composerPhar))
+		_ = putObject(getProcessName(name, num), "composer.phar", bytes.NewReader(composerPhar))
+		_ = putObject(getProcessName(name, num), "download/"+versions["stable"][0].Version+"/composer.phar", bytes.NewReader(composerPhar))
 		_ = phar.Body.Close()
 
 		// Like https://getcomposer.org/download/1.9.1/composer.phar.sig
@@ -85,7 +83,7 @@ func composerPhar(name string, num int) {
 			oss.ContentType("application/json"),
 		}
 
-		sig, err := get("https://getcomposer.org"+versions["stable"][0].Path+".sig", processName)
+		sig, err := get("https://getcomposer.org"+versions["stable"][0].Path+".sig", getProcessName(name, num))
 		if err != nil {
 			continue
 		}
@@ -95,8 +93,8 @@ func composerPhar(name string, num int) {
 		}
 
 		composerPharSig, err := ioutil.ReadAll(sig.Body)
-		_ = putObject(processName, "composer.phar.sig", bytes.NewReader(composerPharSig), options...)
-		_ = putObject(processName, "download/"+versions["stable"][0].Version+"/composer.phar.sig", bytes.NewReader(composerPharSig), options...)
+		_ = putObject(getProcessName(name, num), "composer.phar.sig", bytes.NewReader(composerPharSig), options...)
+		_ = putObject(getProcessName(name, num), "download/"+versions["stable"][0].Version+"/composer.phar.sig", bytes.NewReader(composerPharSig), options...)
 		_ = sig.Body.Close()
 
 		// Sleep

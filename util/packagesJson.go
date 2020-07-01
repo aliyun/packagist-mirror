@@ -15,22 +15,22 @@ var packagesJsonCache []byte
 var packagistLastModified = ""
 var syncHasError = false
 
-func packagesJsonFile(name string, num int) {
-
-	processName := getProcessName(name, num)
+func packagesJsonFile(name string) {
 
 	for {
 		// Each cycle requires a time slot
 		time.Sleep(1 * time.Second)
 
 		// Get root file from repo
-		resp, err := packagistGet("packages.json", processName)
+		resp, err := packagistGet("packages.json", getProcessName(name, 1))
 		if err != nil {
+			sAdd(packagesJsonKey+"-Get", "packages.json")
 			continue
 		}
 
 		// Status code must be 200
 		if resp.StatusCode != 200 {
+			makeStatusCodeFailed(packagesJsonKey, resp.StatusCode, packagistUrl("packages.json"))
 			continue
 		}
 
@@ -41,7 +41,7 @@ func packagesJsonFile(name string, num int) {
 		content, err := ioutil.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			fmt.Println(processName, packagistUrl("packages.json"), err.Error())
+			fmt.Println(getProcessName(name, 1), packagistUrl("packages.json"), err.Error())
 			continue
 		}
 
@@ -54,7 +54,7 @@ func packagesJsonFile(name string, num int) {
 
 		// Cache content
 		if bytes.Equal(packagesJsonCache, content) {
-			fmt.Println(processName, "Update to date: packages.json")
+			fmt.Println(getProcessName(name, 1), "Update to date: packages.json")
 			continue
 		}
 		packagesJsonCache = content
@@ -62,7 +62,7 @@ func packagesJsonFile(name string, num int) {
 		// JSON Decode
 		err = json.Unmarshal(content, &packagesJson)
 		if err != nil {
-			errHandler(err)
+			sAdd("root-json_decode_error", "root")
 			continue
 		}
 
@@ -70,25 +70,26 @@ func packagesJsonFile(name string, num int) {
 		syncHasError = false
 
 		// Dispatch providers
-		dispatchProviders(packagesJson["provider-includes"], processName)
+		dispatchProviders(packagesJson["provider-includes"], name)
 
 		for {
-			left := lLen(processingKey)
 			// If all tasks are completed, skip the loop and update the file
-			if queueExists(providerHashFileKey) == 0 && queueExists(packageHashFileKey) == 0 && queueExists(distsKey) == 0 && left == 0 {
+			left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue) + sCard(packageP2Queue)
+			if left == 0 {
 				break
 			}
-			fmt.Println(processName, "Processing: ", left, " Check again in 1 second. ")
+			fmt.Println(getProcessName(name, 1), "Processing:", left, ", Check again in 1 second. ")
 			time.Sleep(1 * time.Second)
 		}
 
 		if syncHasError == true {
-			fmt.Println(processName, "There is an error in this synchronization. We look forward to the next synchronization...")
+			fmt.Println(getProcessName(name, 1), "There is an error in this synchronization. We look forward to the next synchronization...")
 			continue
 		}
 
 		// Update `packages.json`
 		packagesJson["last-update"] = time.Now().Format("2006-01-02 15:04:05")
+		packagesJson["metadata-url"] = config.ProviderUrl + "p2/%package%.json"
 		packagesJson["providers-url"] = config.ProviderUrl + "p/%package%$%hash%.json"
 		packagesJson["mirrors"] = []map[string]interface{}{
 			{
@@ -105,37 +106,39 @@ func packagesJsonFile(name string, num int) {
 		}
 
 		// Upload Content
-		_ = putObject(processName, "packages.json", contentReader, options...)
+		_ = putObject(getProcessName(name, 1), "packages.json", contentReader, options...)
 	}
 
 }
 
-func dispatchProviders(distMap interface{}, processName string) {
+func dispatchProviders(distMap interface{}, name string) {
 
 	for provider, value := range distMap.(map[string]interface{}) {
 
-		count(providerKey, provider)
-
 		for _, hash := range value.(map[string]interface{}) {
 
-			path := strings.Replace(provider, "%hash%", hash.(string), -1)
+			providerHash := hash.(string)
+			providerPath := strings.Replace(provider, "%hash%", providerHash, -1)
 
-			if isSucceed(providerHashFileKey, path) {
-				fmt.Println(processName, "Already succeed", mirrorUrl(path))
-				continue
+			if hashHGet(providerSet, provider, providerHash) {
+				fmt.Println(getProcessName(name, 1), "Already succeed", mirrorUrl(providerPath))
+			} else {
+				pushProvider(provider, providerPath, providerHash, getProcessName(name, 1))
 			}
 
-			pushProviderToQueue(path, processName)
-			addIntoProcessing(path)
 		}
 
 	}
 
 }
 
-func pushProviderToQueue(path string, processName string) {
-	if pushToQueue(providerHashFileKey, path, processName) {
-		count(providerHashFileKey, path)
-		fmt.Println(processName, "Dispatch", path)
-	}
+func pushProvider(key string, path string, hash string, processName string) {
+	p := make(map[string]interface{})
+	p["key"] = key
+	p["path"] = path
+	p["hash"] = hash
+	jsonP2, _ := json.Marshal(p)
+	sAdd(providerQueue, string(jsonP2))
+	fmt.Println(processName, "Dispatch", path)
+	countToday(providerSet, path)
 }

@@ -4,44 +4,38 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 )
 
 func dists(name string, num int) {
+
 	for {
-		job, err := popFromQueue(distsKey)
-		if err != nil {
+		jobJson := sPop(distQueue)
+		if jobJson == "" {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		uploadDist(job[1], name, num)
+		uploadDist(jobJson, name, num)
 	}
 
 }
 
-func distsRetry(statusCode int, num int) {
-
-	name := "distsRetry" + strconv.Itoa(statusCode)
+func distsRetry(name string, num int) {
 
 	for {
-		job, err := popFromQueueStatusCode(distsKey, statusCode)
-		if err != nil {
+		jobJson := sPop(distQueueRetry)
+		if jobJson == "" {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		fmt.Println(getProcessName(name, num), "Dist Retry", statusCode, job)
-
-		uploadDist(job[1], name, num)
+		uploadDist(jobJson, name, num)
 	}
 
 }
 
 func uploadDist(jobJson string, name string, num int) {
-
-	removeFromQueue(distsKey, jobJson, getProcessName(name, num))
 
 	// Json decode
 	distMap := make(map[string]string)
@@ -65,22 +59,15 @@ func uploadDist(jobJson string, name string, num int) {
 	}
 
 	// Count
-	count(distsKey, path)
-
-	// Redis IsObjectExist
-	if isSucceed(distsKey, path) {
-		fmt.Println(getProcessName(name, num), "Succeed", mirrorUrl(path))
-		return
-	}
+	countToday(distSet, path)
 
 	// OSS IsObjectExist
 	if isObjectExist(getProcessName(name, num), path) {
-		makeSucceed(distsKey, path, getProcessName(name, num))
+		makeSucceed(distSet, path)
 		return
 	}
 
 	// Get dist
-	fmt.Println(getProcessName(name, num), "Downloading", url)
 	// Create a new request using http
 	req, err := http.NewRequest("GET", url, nil)
 	// add authorization header to the req
@@ -92,18 +79,18 @@ func uploadDist(jobJson string, name string, num int) {
 	if err != nil {
 		syncHasError = true
 		fmt.Println(getProcessName(name, num), path, err.Error())
-		makeFailed(distsKey, path, jobJson+err.Error())
+		makeFailed(distSet, path)
 		return
 	}
 
 	if resp.StatusCode != 200 {
 		syncHasError = true
 		// Make failed count
-		makeStatusCodeFailed(distsKey, resp.StatusCode, path, url)
+		makeStatusCodeFailed(distSet, resp.StatusCode, url)
 
 		// Push into failed queue to retry
 		if resp.StatusCode != 404 && resp.StatusCode != 410 {
-			pushToQueueForStatusCodeRetry(distsKey, resp.StatusCode, jobJson)
+			sAdd(distQueueRetry, jobJson)
 		}
 
 		fmt.Println(
@@ -122,7 +109,7 @@ func uploadDist(jobJson string, name string, num int) {
 		return
 	}
 
-	makeSucceed(distsKey, path, getProcessName(name, num))
+	makeSucceed(distSet, path)
 
-	cdnCache(path, getProcessName(name, num))
+	cdnCache(path, name, num)
 }
