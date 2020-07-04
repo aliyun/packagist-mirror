@@ -7,7 +7,7 @@ English | [简体中文](/README-zh-CN.md)
 ![](https://aliyunsdk-pages.alicdn.com/icons/AlibabaCloud.svg)
 
 
-Alibaba cloud packagist mirror is an open source system that Alibaba cloud helps PHP developers speed up the installation of [composer](https://getcomposer.org) dependent packages. Welcome to use [Alibaba Cloud Composer Mirror](https://developer.aliyun.com/composer).
+Alibaba Cloud Packagist Mirror is an open source system that Alibaba Cloud helps PHP developers speed up the installation of [Composer](https://getcomposer.org) dependent packages. Welcome to use [Alibaba Cloud Packagist Mirror](https://developer.aliyun.com/composer).
 
 
 ## Quick Start
@@ -22,16 +22,17 @@ REDIS_DB: 0
 OSS_ACCESS_KEY_ID: "OSS AccessKeyID"
 OSS_ACCESS_KEY_SECRET: "OSS AccessKeySecret"
 OSS_ENDPOINT: "OSS endpoint, such as oss-cn-hangzhou.aliyuncs.com"
-OSS_BUCKET: "Bucket name"
+OSS_BUCKET: "Bucket"
 
 # Unlimited to request dist
 GITHUB_TOKEN: "GitHub token, such as: 6a023b828b17*****0ab5tgj6ddb3f0ccb3d30e0"
 
 REPO_URL: "Synchronization source address, such as https://mirrors.aliyun.com/composer/"
+API_URL: "Change monitoring API address, such as: https://packagist.org/"
 MIRROR_URL: "Mirror website, such as https://developer.aliyun.com/composer/"
 DIST_URL: "Download address of zip package, such as https://mirrors.aliyun.com/composer/dists/"
-
 PROVIDER_URL: "Provider prefix"
+
 BUILD_CACHE: "true"
 ```
 
