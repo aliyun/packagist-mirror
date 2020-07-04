@@ -61,7 +61,7 @@ func status(name string, processNum int) {
 		// Queue
 		Content["Queue"] = map[string]interface{}{
 			"Providers":  sCard(providerQueue),
-			"Packages":   sCard(packageP1Queue) + sCard(packageP2Queue),
+			"Packages":   sCard(packageP1Queue) + sCard(packageV2Queue),
 			"Dists":      sCard(distQueue),
 			"DistsRetry": sCard(distQueueRetry),
 		}
@@ -76,7 +76,7 @@ func status(name string, processNum int) {
 			"Dists_Not_Found":             countStatusCodedFailed(distSet, 404),
 			"Dists_Internal_Server_Error": countStatusCodedFailed(distSet, 500),
 			"Dists_Bad_Gateway":           countStatusCodedFailed(distSet, 502),
-			"Packages":                    hLen(packageP1Set),
+			"Packages":                    hLen(packageV1Set),
 			"Packages_No_Data":            sCard(packagesNoData),
 			"Providers":                   hLen(providerSet),
 			"Versions":                    sCard(versionsSet),
@@ -85,8 +85,8 @@ func status(name string, processNum int) {
 		// Today Updated
 		Content["Today_Updated"] = map[string]interface{}{
 			"Dists":             sCard(getTodayKey(distSet)),
-			"Packages":          sCard(getTodayKey(packageP1Set)),
-			"PackagesHashFile":  sCard(getTodayKey(packageP1SetHash)),
+			"Packages":          sCard(getTodayKey(packageV1Set)),
+			"PackagesHashFile":  sCard(getTodayKey(packageV1SetHash)),
 			"ProvidersHashFile": sCard(getTodayKey(providerSet)),
 			"Versions":          sCard(getTodayKey(versionsSet)),
 		}

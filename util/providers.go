@@ -48,7 +48,7 @@ func providers(name string, num int) {
 		if err != nil {
 			syncHasError = true
 			fmt.Println(getProcessName(name, num), path, err.Error())
-			makeFailed(providerSet, path)
+			makeFailed(providerSet, path, err)
 			continue
 		}
 
@@ -117,46 +117,17 @@ func providers(name string, num int) {
 
 func dispatchPackages(distMap interface{}) {
 	for packageName, value := range distMap.(map[string]interface{}) {
-
 		for _, hash := range value.(map[string]interface{}) {
-
 			sha256 := hash.(string)
-
-			// Support Composer 1.X
-			if !hashHGet(packageP1Set, packageName, sha256) {
+			if !hGetValue(packageV1Set, packageName, sha256) {
 				p1 := make(map[string]interface{})
 				p1["key"] = packageName
 				p1["path"] = "p/" + packageName + "$" + sha256 + ".json"
 				p1["hash"] = sha256
 				jsonP1, _ := json.Marshal(p1)
 				sAdd(packageP1Queue, string(jsonP1))
-				countToday(packageP1Set, packageName)
+				countToday(packageV1Set, packageName)
 			}
-
-			// Support Composer 2.0
-			key := "p2/" + packageName + ".json"
-			if !hashHGet(packageP2Set, key, sha256) {
-				p2 := make(map[string]interface{})
-				p2["key"] = key
-				p2["path"] = key
-				p2["hash"] = sha256
-				jsonP2, _ := json.Marshal(p2)
-				sAdd(packageP2Queue, string(jsonP2))
-			}
-
-			// Support Composer 2.0 ~dev.json
-			keyDev := "p2/" + packageName + "~dev.json"
-			if !hashHGet(packageP2DevSet, keyDev, sha256) {
-				p2dev := make(map[string]interface{})
-				p2dev["key"] = keyDev
-				p2dev["path"] = keyDev
-				p2dev["hash"] = sha256
-				jsonP2dev, _ := json.Marshal(p2dev)
-				sAdd(packageP2DevQueue, string(jsonP2dev))
-			}
-
 		}
-
 	}
-
 }

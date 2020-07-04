@@ -27,11 +27,12 @@ OSS_BUCKET: "Bucket name"
 # Unlimited to request dist
 GITHUB_TOKEN: "GitHub token, such as: 6a023b828b17*****0ab5tgj6ddb3f0ccb3d30e0"
 
-DATA_URL: "Synchronization source address, such as https://mirrors.aliyun.com/composer/"
+REPO_URL: "Synchronization source address, such as https://mirrors.aliyun.com/composer/"
 MIRROR_URL: "Mirror website, such as https://developer.aliyun.com/composer/"
 DIST_URL: "Download address of zip package, such as https://mirrors.aliyun.com/composer/dists/"
 
 PROVIDER_URL: "Provider prefix"
+BUILD_CACHE: "true"
 ```
 
 

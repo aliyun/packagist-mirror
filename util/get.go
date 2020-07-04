@@ -10,14 +10,25 @@ func mirrorUrl(path string) string {
 }
 
 func packagistUrl(url string) string {
-	return config.DataUrl + url
+	return config.RepoUrl + url
+}
+
+func packagistUrlApi(url string) string {
+	return config.ApiUrl + url
 }
 
 func packagistGet(url string, processName string) (*http.Response, error) {
 	return getJSON(packagistUrl(url), processName)
 }
 
+func packagistGetApi(url string, processName string) (*http.Response, error) {
+	return getJSON(packagistUrlApi(url), processName)
+}
+
 func cdnCache(url string, name string, num int) {
+	if config.BuildCache != "true" {
+		return
+	}
 	processName := getProcessName(name, num)
 	url = mirrorUrl(url)
 	client := http.Client{}

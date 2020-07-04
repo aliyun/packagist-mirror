@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func packagesP1(name string, num int) {
+func packagesV1(name string, num int) {
 
 	for {
 		jobJson := sPop(packageP1Queue)
@@ -23,7 +23,7 @@ func packagesP1(name string, num int) {
 		err := json.Unmarshal([]byte(jobJson), &JobMap)
 		if err != nil {
 			fmt.Println(getProcessName(name, num), "JSON Decode Error:", jobJson)
-			sAdd(packageP1Set+"-json_decode_error", jobJson)
+			sAdd(packageV1Set+"-json_decode_error", jobJson)
 			continue
 		}
 
@@ -49,7 +49,7 @@ func packagesP1(name string, num int) {
 		if err != nil {
 			syncHasError = true
 			fmt.Println(getProcessName(name, num), path, err.Error())
-			makeFailed(packageP1Set, path)
+			makeFailed(packageV1Set, path, err)
 			continue
 		}
 
@@ -57,7 +57,7 @@ func packagesP1(name string, num int) {
 			syncHasError = true
 
 			// Make failed count
-			makeStatusCodeFailed(packageP1Set, resp.StatusCode, path)
+			makeStatusCodeFailed(packageV1Set, resp.StatusCode, path)
 
 			// Push into failed queue to retry
 			if resp.StatusCode != 404 && resp.StatusCode != 410 {
@@ -107,10 +107,10 @@ func packagesP1(name string, num int) {
 			continue
 		}
 
-		hSet(packageP1Set, key, hash)
+		hSet(packageV1Set, key, hash)
 		dispatchDists(distMap["packages"], getProcessName(name, num), packagistUrl(path))
 		cdnCache(path, name, num)
-		countToday(packageP1SetHash, path)
+		countToday(packageV1SetHash, path)
 	}
 
 }

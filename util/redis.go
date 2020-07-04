@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"github.com/go-redis/redis"
 	"strconv"
 	"time"
@@ -72,6 +73,10 @@ func hSet(key string, field string, content string) {
 	redisClient.HSet(key, field, content)
 }
 
+func hDel(key string, field string) {
+	redisClient.HDel(key, field)
+}
+
 func hGet(key, field string) string {
 	value, err := redisClient.HGet(key, field).Result()
 	if err != nil {
@@ -88,8 +93,8 @@ func hLen(key string) int64 {
 	return num
 }
 
-func hashHGet(key string, field string, hash string) bool {
-	return hGet(key, field) == hash
+func hGetValue(key string, field string, value string) bool {
+	return hGet(key, field) == value
 }
 
 func makeSucceed(key string, field string) {
@@ -102,19 +107,19 @@ func makeSucceed(key string, field string) {
 	removeFailed(key, field)
 }
 
-func makeFailed(key string, field string) {
+func makeFailed(key string, field string, err error) {
 	key += "-failed"
-	sAdd(key, field)
+	hSet(key, field, err.Error())
 }
 
 func removeFailed(key string, field string) {
 	key += "-failed"
-	sRem(key, field)
+	hDel(key, field)
 }
 
 func countFailed(key string) int64 {
 	key += "-failed"
-	return sCard(key)
+	return hLen(key)
 }
 
 func makeStatusCodeFailed(key string, statusCode int, field string) {
@@ -130,4 +135,20 @@ func removeStatusCodeFailed(key string, field string, statusCode int) {
 func countStatusCodedFailed(key string, statusCode int) int64 {
 	key += "-" + strconv.Itoa(statusCode)
 	return sCard(key)
+}
+
+func getLastTimestamp() string {
+	value, err := redisClient.Get("lastTimestamp").Result()
+	if err != nil {
+		return ""
+	}
+
+	return value
+}
+
+func setLastTimestamp(timestamp string) {
+	err := redisClient.Set("lastTimestamp", timestamp, 0).Err()
+	if err != nil {
+		fmt.Println(timestamp, err.Error())
+	}
 }

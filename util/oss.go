@@ -31,10 +31,22 @@ func putObject(processName string, objectKey string, reader io.Reader, options .
 	if err != nil {
 		fmt.Println(processName, "OSS Error", tc, mirrorUrl(objectKey), err.Error())
 	} else {
-		fmt.Println(processName, "OSS Putted", tc, mirrorUrl(objectKey))
+		fmt.Println(processName, "OSS Put", tc, mirrorUrl(objectKey))
 	}
 
 	return err
+}
+
+func deleteObject(processName string, objectName string) {
+	startT := time.Now()
+	tc := time.Since(startT)
+
+	err := bucket(config.OSSBucket, config.OSSEndpoint).DeleteObject(objectName)
+	if err != nil {
+		fmt.Println(processName, "OSS Error", tc, mirrorUrl(objectName), err.Error())
+	} else {
+		fmt.Println(processName, "OSS Deleted", tc, mirrorUrl(objectName))
+	}
 }
 
 func isObjectExist(processName string, objectKey string) bool {

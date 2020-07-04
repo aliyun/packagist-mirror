@@ -18,18 +18,16 @@ const (
 
 	distSet          = "set:dists"
 	providerSet      = "set:providers"
-	packageP1Set     = "set:packagesP1"
-	packageP1SetHash = "set:packagesP1-Hash"
-	packageP2Set     = "set:packagesP2"
-	packageP2DevSet  = "set:packagesP2-Dev"
+	packageV1Set     = "set:packagesV1"
+	packageV1SetHash = "set:packagesV1-Hash"
+	packageV2Set     = "set:packagesV2"
 	versionsSet      = "set:versions"
 
-	distQueue         = "queue:dists"
-	distQueueRetry    = "queue:dists-Retry"
-	providerQueue     = "queue:providers"
-	packageP1Queue    = "queue:packagesP1"
-	packageP2Queue    = "queue:packagesP2"
-	packageP2DevQueue = "queue:packagesP2-Dev"
+	distQueue      = "queue:dists"
+	distQueueRetry = "queue:dists-Retry"
+	providerQueue  = "queue:providers"
+	packageP1Queue = "queue:packagesV1"
+	packageV2Queue = "queue:packagesV2"
 )
 
 var (
@@ -49,9 +47,11 @@ type Config struct {
 	OSSBucket          string `yaml:"OSS_BUCKET"`
 	GithubToken        string `yaml:"GITHUB_TOKEN"`
 	MirrorUrl          string `yaml:"MIRROR_URL"`
-	DataUrl            string `yaml:"DATA_URL"`
+	RepoUrl            string `yaml:"REPO_URL"`
+	ApiUrl             string `yaml:"API_URL"`
 	ProviderUrl        string `yaml:"PROVIDER_URL"`
 	DistUrl            string `yaml:"DIST_URL"`
+	BuildCache         string `yaml:"BUILD_CACHE"`
 }
 
 func loadConfig() {
@@ -116,8 +116,12 @@ func getConf(conf *Config) error {
 		err = errors.New("please set necessary environment variable: MIRROR_URL")
 	}
 
-	if conf.DataUrl == "" {
-		err = errors.New("please set necessary environment variable: DATA_URL")
+	if conf.RepoUrl == "" {
+		err = errors.New("please set necessary environment variable: REPO_URL")
+	}
+
+	if conf.ApiUrl == "" {
+		err = errors.New("please set necessary environment variable: API_URL")
 	}
 
 	if conf.ProviderUrl == "" {
@@ -126,6 +130,10 @@ func getConf(conf *Config) error {
 
 	if conf.DistUrl == "" {
 		err = errors.New("please set necessary environment variable: DIST_URL")
+	}
+
+	if conf.BuildCache == "" {
+		err = errors.New("please set necessary environment variable: BUILD_CACHE")
 	}
 
 	return err
