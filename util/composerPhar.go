@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"io/ioutil"
 	"time"
-
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
 var versions = make(map[string][]stable)

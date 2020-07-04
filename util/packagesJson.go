@@ -74,7 +74,8 @@ func packagesJsonFile(name string) {
 
 		for {
 			// If all tasks are completed, skip the loop and update the file
-			left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue) + sCard(packageP2Queue)
+			//left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue) + sCard(packageV2Queue)
+			left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue)
 			if left == 0 {
 				break
 			}
@@ -120,10 +121,10 @@ func dispatchProviders(distMap interface{}, name string) {
 			providerHash := hash.(string)
 			providerPath := strings.Replace(provider, "%hash%", providerHash, -1)
 
-			if hashHGet(providerSet, provider, providerHash) {
-				fmt.Println(getProcessName(name, 1), "Already succeed", mirrorUrl(providerPath))
-			} else {
+			if !hGetValue(providerSet, provider, providerHash) {
 				pushProvider(provider, providerPath, providerHash, getProcessName(name, 1))
+			} else {
+				fmt.Println(getProcessName(name, 1), "Already succeed", mirrorUrl(providerPath))
 			}
 
 		}

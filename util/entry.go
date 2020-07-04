@@ -15,6 +15,8 @@ func Execute() {
 	// Synchronize packages.json
 	go packagesJsonFile("PackagesJson")
 
+	go syncV2("syncV2")
+
 	// Update status
 	go status("Status", 1)
 
@@ -25,16 +27,13 @@ func Execute() {
 	}
 
 	for i := 0; i < 60; i++ {
-		go packagesP1("PackagesP1", i)
+		go packagesV1("packagesV1", i)
 	}
 
 	for i := 0; i < 60; i++ {
-		go packagesP2("PackagesP2", i)
+		go packagesV2("packagesV2", i)
 	}
 
-	for i := 0; i < 60; i++ {
-		go packagesP2Dev("PackagesP2Dev", i)
-	}
 
 	for i := 0; i < 60; i++ {
 		go dists("Dists", i)

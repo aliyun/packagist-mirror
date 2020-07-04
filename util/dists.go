@@ -79,7 +79,7 @@ func uploadDist(jobJson string, name string, num int) {
 	if err != nil {
 		syncHasError = true
 		fmt.Println(getProcessName(name, num), path, err.Error())
-		makeFailed(distSet, path)
+		makeFailed(distSet, path, err)
 		return
 	}
 

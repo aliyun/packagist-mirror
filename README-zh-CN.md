@@ -28,7 +28,7 @@ OSS_BUCKET: "Bucket 名"
 # 为了请求 Dist 不受限制
 GITHUB_TOKEN: "Github Token，如：6a023b828b17*****0ab5tgj6ddb3f0ccb3d30e0"
 
-DATA_URL: "同步源地址，如：https://mirrors.aliyun.com/composer/"
+REPO_URL: "同步源地址，如：https://mirrors.aliyun.com/composer/"
 MIRROR_URL: "镜像网址，如：https://developer.aliyun.com/composer/"
 DIST_URL: "ZIP包下载地址，如：https://mirrors.aliyun.com/composer/dists/"
 
