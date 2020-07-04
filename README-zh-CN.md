@@ -23,16 +23,18 @@ REDIS_DB: 0
 OSS_ACCESS_KEY_ID: "OSS AccessKeyID"
 OSS_ACCESS_KEY_SECRET: "OSS AccessKeySecret"
 OSS_ENDPOINT: "OSS Endpoint，如：oss-cn-hangzhou.aliyuncs.com"
-OSS_BUCKET: "Bucket 名"
+OSS_BUCKET: "Bucket"
 
 # 为了请求 Dist 不受限制
 GITHUB_TOKEN: "Github Token，如：6a023b828b17*****0ab5tgj6ddb3f0ccb3d30e0"
 
 REPO_URL: "同步源地址，如：https://mirrors.aliyun.com/composer/"
+API_URL: "变更监测API地址，如：https://packagist.org/"
 MIRROR_URL: "镜像网址，如：https://developer.aliyun.com/composer/"
 DIST_URL: "ZIP包下载地址，如：https://mirrors.aliyun.com/composer/dists/"
-
 PROVIDER_URL: "Provider 前缀"
+
+BUILD_CACHE: "true"
 ```
 
 
