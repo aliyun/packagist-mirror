@@ -10,7 +10,7 @@ import (
 )
 
 var versions = make(map[string][]stable)
-var versionsCache []byte
+var versionsContentCache []byte
 
 type stable struct {
 	Path    string `json:"path"`
@@ -21,9 +21,6 @@ type stable struct {
 func composerPhar(name string, num int) {
 
 	for {
-		// Sleep
-		time.Sleep(1 * time.Second)
-
 		// Get latest stable version
 		versionUrl := "https://getcomposer.org/versions"
 		resp, err := get(versionUrl, getProcessName(name, num))
@@ -35,27 +32,31 @@ func composerPhar(name string, num int) {
 			continue
 		}
 
-		content, err := ioutil.ReadAll(resp.Body)
+		versionsContent, err := ioutil.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
 			fmt.Println(getProcessName(name, num), versionUrl, err.Error())
 			continue
 		}
 
-		if bytes.Equal(versionsCache, content) {
-			fmt.Println(getProcessName(name, num), "Update to date:", versionUrl)
+		if bytes.Equal(versionsContentCache, versionsContent) {
 			continue
 		}
-		versionsCache = content
 
 		// Sync versions
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		_ = putObject(getProcessName(name, num), "versions", bytes.NewReader(content), options...)
+		err = putObject(getProcessName(name, num), "versions", bytes.NewReader(versionsContent), options...)
+		if err != nil {
+			continue
+		}
+
+		// The cache is updated only if the push is successful
+		versionsContentCache = versionsContent
 
 		// JSON Decode
-		err = json.Unmarshal(content, &versions)
+		err = json.Unmarshal(versionsContent, &versions)
 		if err != nil {
 			errHandler(err)
 			continue

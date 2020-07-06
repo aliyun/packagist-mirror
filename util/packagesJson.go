@@ -11,7 +11,7 @@ import (
 )
 
 var packagesJson = make(map[string]interface{})
-var packagesJsonCache []byte
+var packagesContentCache []byte
 var packagistLastModified = ""
 var syncHasError = false
 
@@ -21,7 +21,7 @@ func packagesJsonFile(name string) {
 		// Each cycle requires a time slot
 		time.Sleep(1 * time.Second)
 
-		// Get root file from repo
+		// Get root file from packagist repo
 		resp, err := packagistGet("packages.json", getProcessName(name, 1))
 		if err != nil {
 			sAdd(packagesJsonKey+"-Get", "packages.json")
@@ -38,7 +38,7 @@ func packagesJsonFile(name string) {
 		packagistLastModified = resp.Header["Last-Modified"][0]
 
 		// Read data stream from body
-		content, err := ioutil.ReadAll(resp.Body)
+		packagistContent, err := ioutil.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
 			fmt.Println(getProcessName(name, 1), packagistUrl("packages.json"), err.Error())
@@ -46,20 +46,18 @@ func packagesJsonFile(name string) {
 		}
 
 		// Decode content if Gzip
-		content, err = decode(content)
+		packagistContent, err = decode(packagistContent)
 		if err != nil {
 			fmt.Println("parseGzip Error", err.Error())
 			continue
 		}
 
-		// Cache content
-		if bytes.Equal(packagesJsonCache, content) {
+		if bytes.Equal(packagesContentCache, packagistContent) {
 			continue
 		}
-		packagesJsonCache = content
 
 		// JSON Decode
-		err = json.Unmarshal(content, &packagesJson)
+		err = json.Unmarshal(packagistContent, &packagesJson)
 		if err != nil {
 			sAdd("root-json_decode_error", "root")
 			continue
@@ -99,14 +97,19 @@ func packagesJsonFile(name string) {
 		}
 
 		// Json Encode
-		content, _ = json.Marshal(packagesJson)
-		contentReader := bytes.NewReader(content)
+		packagesJsonNew, _ := json.Marshal(packagesJson)
+
+		// Update packages.json
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
+		err = putObject(getProcessName(name, 1), "packages.json", bytes.NewReader(packagesJsonNew), options...)
+		if err != nil {
+			continue
+		}
 
-		// Upload Content
-		_ = putObject(getProcessName(name, 1), "packages.json", contentReader, options...)
+		// The cache is updated only if the push is successful
+		packagesContentCache = packagistContent
 	}
 
 }
