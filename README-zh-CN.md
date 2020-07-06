@@ -35,6 +35,9 @@ DIST_URL: "ZIP包下载地址，如：https://mirrors.aliyun.com/composer/dists/
 PROVIDER_URL: "Provider 前缀"
 
 BUILD_CACHE: "true"
+
+API_ITERATION_INTERVAL: 5
+USER_AGENT: "Alibaba Cloud"
 ```
 
 

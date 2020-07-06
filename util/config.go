@@ -38,20 +38,22 @@ var (
 
 // Config Mirror Config
 type Config struct {
-	RedisAddr          string `yaml:"REDIS_ADDR"`
-	RedisPassword      string `yaml:"REDIS_PASSWORD"`
-	RedisDB            int    `yaml:"REDIS_DB"`
-	OSSAccessKeyID     string `yaml:"OSS_ACCESS_KEY_ID"`
-	OSSAccessKeySecret string `yaml:"OSS_ACCESS_KEY_SECRET"`
-	OSSEndpoint        string `yaml:"OSS_ENDPOINT"`
-	OSSBucket          string `yaml:"OSS_BUCKET"`
-	GithubToken        string `yaml:"GITHUB_TOKEN"`
-	MirrorUrl          string `yaml:"MIRROR_URL"`
-	RepoUrl            string `yaml:"REPO_URL"`
-	ApiUrl             string `yaml:"API_URL"`
-	ProviderUrl        string `yaml:"PROVIDER_URL"`
-	DistUrl            string `yaml:"DIST_URL"`
-	BuildCache         string `yaml:"BUILD_CACHE"`
+	UserAgent            string `yaml:"USER_AGENT"`
+	RedisAddr            string `yaml:"REDIS_ADDR"`
+	RedisPassword        string `yaml:"REDIS_PASSWORD"`
+	RedisDB              int    `yaml:"REDIS_DB"`
+	OSSAccessKeyID       string `yaml:"OSS_ACCESS_KEY_ID"`
+	OSSAccessKeySecret   string `yaml:"OSS_ACCESS_KEY_SECRET"`
+	OSSEndpoint          string `yaml:"OSS_ENDPOINT"`
+	OSSBucket            string `yaml:"OSS_BUCKET"`
+	GithubToken          string `yaml:"GITHUB_TOKEN"`
+	MirrorUrl            string `yaml:"MIRROR_URL"`
+	RepoUrl              string `yaml:"REPO_URL"`
+	ApiUrl               string `yaml:"API_URL"`
+	ProviderUrl          string `yaml:"PROVIDER_URL"`
+	DistUrl              string `yaml:"DIST_URL"`
+	BuildCache           string `yaml:"BUILD_CACHE"`
+	ApiIterationInterval int    `yaml:"API_ITERATION_INTERVAL"`
 }
 
 func loadConfig() {
@@ -134,6 +136,14 @@ func getConf(conf *Config) error {
 
 	if conf.BuildCache == "" {
 		err = errors.New("please set necessary environment variable: BUILD_CACHE")
+	}
+
+	if conf.UserAgent == "" {
+		err = errors.New("please set necessary environment variable: USER_AGENT")
+	}
+
+	if conf.ApiIterationInterval <= 0 {
+		err = errors.New("please set necessary environment variable: API_ITERATION_INTERVAL")
 	}
 
 	return err
