@@ -74,7 +74,7 @@ func packagesJsonFile(name string) {
 
 		for {
 			// If all tasks are completed, skip the loop and update the file
-			//left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue) + sCard(packageV2Queue)
+			// left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue) + sCard(packageV2Queue)
 			left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue)
 			if left == 0 {
 				break

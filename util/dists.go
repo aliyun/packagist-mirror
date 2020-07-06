@@ -30,6 +30,7 @@ func distsRetry(name string, num int) {
 			continue
 		}
 
+		time.Sleep(2 * time.Second)
 		uploadDist(jobJson, name, num)
 	}
 
@@ -72,7 +73,7 @@ func uploadDist(jobJson string, name string, num int) {
 	req, err := http.NewRequest("GET", url, nil)
 	// add authorization header to the req
 	req.Header.Add("Authorization", "token "+config.GithubToken)
-	req.Header.Add("User-Agent", "Alibaba")
+	req.Header.Add("User-Agent", config.UserAgent)
 	// Send req using http Client
 	client := &http.Client{}
 	resp, err := client.Do(req)

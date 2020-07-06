@@ -34,6 +34,9 @@ DIST_URL: "Download address of zip package, such as https://mirrors.aliyun.com/c
 PROVIDER_URL: "Provider prefix"
 
 BUILD_CACHE: "true"
+
+API_ITERATION_INTERVAL: 5
+USER_AGENT: "Alibaba Cloud"
 ```
 
 

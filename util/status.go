@@ -3,10 +3,13 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"strconv"
 	"time"
 )
+
+var statusCache []byte
 
 func status(name string, processNum int) {
 
@@ -92,10 +95,17 @@ func status(name string, processNum int) {
 		}
 
 		status["Content"] = Content
-		status["UpdateAt"] = time.Now().Format("2006-01-02 15:04:05")
 		status["CacheSeconds"] = 30
 
 		statusResult, _ := json.Marshal(status)
+
+		if bytes.Equal(statusCache, statusResult) {
+			fmt.Println(getProcessName(name, 1), "Update to date: status.json")
+			continue
+		}
+
+		statusCache = statusResult
+
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}

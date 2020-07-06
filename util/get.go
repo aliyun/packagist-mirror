@@ -53,7 +53,7 @@ func cdnCache(url string, name string, num int) {
 func getJSON(url string, processName string) (*http.Response, error) {
 	client := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Add("User-Agent", "Alibaba")
+	req.Header.Add("User-Agent", config.UserAgent)
 	req.Header.Add("Content-Encoding", "gzip")
 	req.Header.Add("Accept-Encoding", "gzip")
 	resp, err := client.Do(req)

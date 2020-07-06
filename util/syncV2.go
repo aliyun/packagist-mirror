@@ -12,14 +12,14 @@ var lastTimestamp = ""
 
 func syncV2(processName string) {
 	for {
-		// Each cycle requires a time slot
-		time.Sleep(60 * time.Second)
 		lastTimestamp = getLastTimestamp()
 		if lastTimestamp == "" {
 			initTimestamp(processName)
 			continue
 		}
 		getChangesAndUpdateTimestamp(processName)
+		// Each cycle requires a time slot
+		time.Sleep(time.Duration(config.ApiIterationInterval) * time.Second)
 	}
 }
 
