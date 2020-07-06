@@ -3,7 +3,6 @@ package util
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"strconv"
 	"time"
