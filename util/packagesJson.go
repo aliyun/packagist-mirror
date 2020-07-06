@@ -54,7 +54,6 @@ func packagesJsonFile(name string) {
 
 		// Cache content
 		if bytes.Equal(packagesJsonCache, content) {
-			fmt.Println(getProcessName(name, 1), "Update to date: packages.json")
 			continue
 		}
 		packagesJsonCache = content

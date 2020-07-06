@@ -58,7 +58,6 @@ func getChangesAndUpdateTimestamp(processName string) {
 	// Dispatch changes
 	timestampAPI := strconv.FormatInt(int64(changesJson["timestamp"].(float64)), 10)
 	if timestampAPI == lastTimestamp {
-		fmt.Println(getProcessName(processName, 1), "No Changes", "Redis:", lastTimestamp, "API:", timestampAPI)
 		return
 	}
 	dispatchChanges(changesJson["actions"], processName)

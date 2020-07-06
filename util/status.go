@@ -100,7 +100,6 @@ func status(name string, processNum int) {
 		statusResult, _ := json.Marshal(status)
 
 		if bytes.Equal(statusCache, statusResult) {
-			fmt.Println(getProcessName(name, 1), "Update to date: status.json")
 			continue
 		}
 
