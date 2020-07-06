@@ -95,18 +95,18 @@ func status(name string, processNum int) {
 
 		status["Content"] = Content
 		status["CacheSeconds"] = 30
-
 		statusContent, _ := json.Marshal(status)
-
 		if bytes.Equal(statusContentCache, statusContent) {
 			continue
 		}
 
 		// Update status.json
+		status["UpdateAt"] = time.Now().Format("2006-01-02 15:04:05")
+		ossStatusContent, _ := json.Marshal(status)
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		err := putObject(processName, "status.json", bytes.NewReader(statusContent), options...)
+		err := putObject(processName, "status.json", bytes.NewReader(ossStatusContent), options...)
 		if err != nil {
 			continue
 		}
