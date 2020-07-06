@@ -32,7 +32,7 @@ func Execute() {
 	}
 
 	for i := 0; i < 60; i++ {
-		go packagesV2("PackagesV2", i)
+		go packagesV2("SyncV2PackagesV2", i)
 	}
 
 	for i := 0; i < 60; i++ {
