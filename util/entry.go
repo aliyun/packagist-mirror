@@ -16,7 +16,7 @@ func Execute() {
 	go packagesJsonFile("PackagesJson")
 
 	// Synchronize Meta for V2
-	go syncV2("syncV2")
+	go syncV2("SyncV2")
 
 	// Update status
 	go status("Status", 1)
@@ -28,11 +28,11 @@ func Execute() {
 	}
 
 	for i := 0; i < 60; i++ {
-		go packagesV1("packagesV1", i)
+		go packagesV1("PackagesV1", i)
 	}
 
 	for i := 0; i < 60; i++ {
-		go packagesV2("packagesV2", i)
+		go packagesV2("PackagesV2", i)
 	}
 
 	for i := 0; i < 60; i++ {

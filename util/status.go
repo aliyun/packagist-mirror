@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var statusCache []byte
+var statusContentCache []byte
 
 func status(name string, processNum int) {
 
@@ -96,20 +96,23 @@ func status(name string, processNum int) {
 		status["Content"] = Content
 		status["CacheSeconds"] = 30
 
-		statusResult, _ := json.Marshal(status)
+		statusContent, _ := json.Marshal(status)
 
-		if bytes.Equal(statusCache, statusResult) {
+		if bytes.Equal(statusContentCache, statusContent) {
 			continue
 		}
 
-		statusCache = statusResult
-
+		// Update status.json
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
+		err := putObject(processName, "status.json", bytes.NewReader(statusContent), options...)
+		if err != nil {
+			continue
+		}
 
-		_ = putObject(processName, "status.json", bytes.NewReader(statusResult), options...)
-
+		// The cache is updated only if the push is successful
+		statusContentCache = statusContent
 	}
 
 }
