@@ -23,19 +23,19 @@ func Execute() {
 
 	Wg.Add(1)
 
-	for i := 0; i < 13; i++ {
+	for i := 0; i < 12; i++ {
 		go providers("Provider", i)
 	}
 
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 10; i++ {
 		go packagesV1("PackagesV1", i)
 	}
 
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 10; i++ {
 		go packagesV2("SyncV2PackagesV2", i)
 	}
 
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 30; i++ {
 		go dists("Dists", i)
 	}
 
