@@ -21,6 +21,9 @@ type stable struct {
 func composerPhar(name string, num int) {
 
 	for {
+		// Each cycle requires a time slot
+		time.Sleep(6000 * time.Second)
+
 		// Get latest stable version
 		versionUrl := "https://getcomposer.org/versions"
 		resp, err := get(versionUrl, getProcessName(name, num))
@@ -96,8 +99,5 @@ func composerPhar(name string, num int) {
 		_ = putObject(getProcessName(name, num), "composer.phar.sig", bytes.NewReader(composerPharSig), options...)
 		_ = putObject(getProcessName(name, num), "download/"+versions["stable"][0].Version+"/composer.phar.sig", bytes.NewReader(composerPharSig), options...)
 		_ = sig.Body.Close()
-
-		// Sleep
-		time.Sleep(6000 * time.Second)
 	}
 }
