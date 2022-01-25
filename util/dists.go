@@ -3,7 +3,6 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 )
 
@@ -69,14 +68,8 @@ func uploadDist(jobJson string, name string, num int) {
 	}
 
 	// Get dist
-	// Create a new request using http
-	req, err := http.NewRequest("GET", url, nil)
-	// add authorization header to the req
-	req.Header.Add("Authorization", "token "+config.GithubToken)
-	req.Header.Add("User-Agent", config.UserAgent)
-	// Send req using http Client
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := GetDistFromGithub(url, config.GithubToken, config.UserAgent)
+
 	if err != nil {
 		syncHasError = true
 		fmt.Println(getProcessName(name, num), path, err.Error())
@@ -102,7 +95,6 @@ func uploadDist(jobJson string, name string, num int) {
 		)
 		return
 	}
-
 	// Put into OSS
 	err = putObject(getProcessName(name, num), path, resp.Body)
 	if err != nil {
