@@ -2,6 +2,8 @@
 
 
 # Alibaba Cloud Packagist Mirror
+[![Go](https://github.com/aliyun/packagist-mirror/actions/workflows/go.yml/badge.svg)](https://github.com/aliyun/packagist-mirror/actions/workflows/go.yml)
+[![codecov](https://codecov.io/gh/aliyun/packagist-mirror/branch/master/graph/badge.svg?token=SQXQW0RAFC)](https://codecov.io/gh/aliyun/packagist-mirror)
 [![Go Report Card](https://goreportcard.com/badge/github.com/aliyun/packagist-mirror)](https://goreportcard.com/report/github.com/aliyun/packagist-mirror)
 
 ![](https://aliyunsdk-pages.alicdn.com/icons/AlibabaCloud.svg)
