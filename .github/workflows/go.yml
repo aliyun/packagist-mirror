@@ -23,3 +23,5 @@ jobs:
 
     - name: Test
       run: go test -v ./...
+    - name: Code Coverage
+      run: bash <(curl -s https://codecov.io/bash)
