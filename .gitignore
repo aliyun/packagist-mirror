@@ -15,3 +15,5 @@ ding.lock
 packagist.yml
 Gopkg.lock
 go.sum
+coverage.txt
+coverage.html
