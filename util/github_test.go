@@ -11,5 +11,5 @@ func TestGetDistFromGithub(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Equal(t, "application/zip", resp.Header.Get("Content-Type"))
-	assert.Equal(t, "1675303", resp.Header.Get("Content-Length"))
+	assert.Equal(t, "W/\"018eaf23eadb6330d5beec63be068be6494184937c84f7233563e9077c4c506b\"", resp.Header.Get("Etag"))
 }
