@@ -2,20 +2,13 @@ package util
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
 	"strconv"
 	"time"
+
+	"github.com/go-redis/redis"
 )
 
 var redisClient *redis.Client
-
-func initRedisClient() {
-	redisClient = redis.NewClient(&redis.Options{
-		Addr:     config.RedisAddr,
-		Password: config.RedisPassword,
-		DB:       config.RedisDB,
-	})
-}
 
 func countAll(key, member string) {
 	sAdd(key, member)

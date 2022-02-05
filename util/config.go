@@ -2,39 +2,10 @@ package util
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"runtime"
-	"strings"
-	"sync"
 
 	"gopkg.in/yaml.v2"
-)
-
-const (
-	packagesJsonKey = "set:packages.json"
-	packagesNoData  = "set:packages-nodata"
-	distsNoMetaKey  = "set:dists-meta-missing"
-
-	distSet          = "set:dists"
-	providerSet      = "set:providers"
-	packageV1Set     = "set:packagesV1"
-	packageV1SetHash = "set:packagesV1-Hash"
-	packageV2Set     = "set:packagesV2"
-	versionsSet      = "set:versions"
-
-	distQueue      = "queue:dists"
-	distQueueRetry = "queue:dists-Retry"
-	providerQueue  = "queue:providers"
-	packageP1Queue = "queue:packagesV1"
-	packageV2Queue = "queue:packagesV2"
-)
-
-var (
-	// Wg Concurrency control
-	Wg     sync.WaitGroup
-	config = new(Config)
 )
 
 // Config Mirror Config
@@ -57,113 +28,111 @@ type Config struct {
 	ApiIterationInterval int    `yaml:"API_ITERATION_INTERVAL"`
 }
 
-func loadConfig() {
-	err := getConf(config)
-	if err != nil {
-		panic(err.Error())
-	}
+func (config *Config) GetMirrorUrl(path string) string {
+	return config.MirrorUrl + path
 }
 
-func getConf(conf *Config) (err error) {
-	system := runtime.GOOS
-	path, _ := os.Getwd()
-	fmt.Println(path, strings.TrimRight(path, "/main"))
-	if system == "windows" {
-		path = strings.TrimRight(path, "\\main") + "\\packagist.yml"
-	} else {
-		path = strings.TrimRight(path, "/main") + "/packagist.yml"
+func (config *Config) GetPackagistUrl(url string) string {
+	return config.RepoUrl + url
+}
+
+func LoadConfig(configPath string) (conf *Config, err error) {
+	content, err := getYamlContent(configPath)
+	if err != nil {
+		return
 	}
-	ymlFile, err := os.Open(path)
+	conf = new(Config)
+	err = yaml.Unmarshal(content, conf)
+	if err != nil {
+		return
+	}
+	err = conf.ValidateConfig()
+	return
+}
+
+func getYamlContent(yamlPath string) (content []byte, err error) {
+	ymlFile, err := os.Open(yamlPath)
 	if err != nil {
 		return
 	}
 	defer ymlFile.Close()
-	yamlContent, err := ioutil.ReadAll(ymlFile)
-	if err != nil {
-		return
-	}
-	err = yaml.Unmarshal(yamlContent, conf)
-	if err != nil {
-		return
-	}
-
-	err = validateConfig(conf)
+	content, err = ioutil.ReadAll(ymlFile)
 	return
 }
 
-func validateConfig(conf *Config) (err error) {
-	if conf.RedisAddr == "" {
-		err = errors.New("please set necessary environment variable: REDIS_ADDR")
+func (config *Config) ValidateConfig() (err error) {
+	if config.RedisAddr == "" {
+		err = errors.New("Missing configuration: REDIS_ADDR")
 		return
 	}
 
-	if conf.RedisPassword == "" {
-		err = errors.New("please set necessary environment variable: REDIS_PASSWORD")
+	if config.RedisPassword == "" {
+		err = errors.New("Missing configuration: REDIS_PASSWORD")
 		return
 	}
 
-	if conf.OSSAccessKeyID == "" {
-		err = errors.New("please set necessary environment variable: OSS_ACCESS_KEY_ID")
+	if config.OSSAccessKeyID == "" {
+		err = errors.New("Missing configuration: OSS_ACCESS_KEY_ID")
 		return
 	}
 
-	if conf.OSSAccessKeySecret == "" {
-		err = errors.New("please set necessary environment variable: OSS_ACCESS_KEY_SECRET")
+	if config.OSSAccessKeySecret == "" {
+		err = errors.New("Missing configuration: OSS_ACCESS_KEY_SECRET")
 		return
 	}
 
-	if conf.OSSEndpoint == "" {
-		err = errors.New("please set necessary environment variable: OSS_ENDPOINT")
+	if config.OSSEndpoint == "" {
+		err = errors.New("Missing configuration: OSS_ENDPOINT")
 		return
 	}
 
-	if conf.OSSBucket == "" {
-		err = errors.New("please set necessary environment variable: OSS_BUCKET")
+	if config.OSSBucket == "" {
+		err = errors.New("Missing configuration: OSS_BUCKET")
 		return
 	}
 
-	if conf.GithubToken == "" {
-		err = errors.New("please set necessary environment variable: GITHUB_TOKEN")
+	if config.GithubToken == "" {
+		err = errors.New("Missing configuration: GITHUB_TOKEN")
 		return
 	}
 
-	if conf.MirrorUrl == "" {
-		err = errors.New("please set necessary environment variable: MIRROR_URL")
+	if config.MirrorUrl == "" {
+		err = errors.New("Missing configuration: MIRROR_URL")
 		return
 	}
 
-	if conf.RepoUrl == "" {
-		err = errors.New("please set necessary environment variable: REPO_URL")
+	if config.RepoUrl == "" {
+		err = errors.New("Missing configuration: REPO_URL")
 		return
 	}
 
-	if conf.ApiUrl == "" {
-		err = errors.New("please set necessary environment variable: API_URL")
+	if config.ApiUrl == "" {
+		err = errors.New("Missing configuration: API_URL")
 		return
 	}
 
-	if conf.ProviderUrl == "" {
-		err = errors.New("please set necessary environment variable: PROVIDER_URL")
+	if config.ProviderUrl == "" {
+		err = errors.New("Missing configuration: PROVIDER_URL")
 		return
 	}
 
-	if conf.DistUrl == "" {
-		err = errors.New("please set necessary environment variable: DIST_URL")
+	if config.DistUrl == "" {
+		err = errors.New("Missing configuration: DIST_URL")
 		return
 	}
 
-	if conf.BuildCache == "" {
-		err = errors.New("please set necessary environment variable: BUILD_CACHE")
+	if config.BuildCache == "" {
+		err = errors.New("Missing configuration: BUILD_CACHE")
 		return
 	}
 
-	if conf.UserAgent == "" {
-		err = errors.New("please set necessary environment variable: USER_AGENT")
+	if config.UserAgent == "" {
+		err = errors.New("Missing configuration: USER_AGENT")
 		return
 	}
 
-	if conf.ApiIterationInterval <= 0 {
-		err = errors.New("please set necessary environment variable: API_ITERATION_INTERVAL")
+	if config.ApiIterationInterval <= 0 {
+		err = errors.New("Missing configuration: API_ITERATION_INTERVAL")
 		return
 	}
 

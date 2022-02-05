@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"io/ioutil"
 	"time"
+
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
-func packagesV1(name string, num int) {
-
+func (ctx *Context) SyncPackagesV1(processName string) {
 	for {
 		jobJson := sPop(packageP1Queue)
 		if jobJson == "" {
@@ -19,70 +18,70 @@ func packagesV1(name string, num int) {
 		}
 
 		// Json decode
-		JobMap := make(map[string]string)
-		err := json.Unmarshal([]byte(jobJson), &JobMap)
+		jobMap := make(map[string]string)
+		err := json.Unmarshal([]byte(jobJson), &jobMap)
 		if err != nil {
-			fmt.Println(getProcessName(name, num), "JSON Decode Error:", jobJson)
+			fmt.Println(processName, "JSON Decode Error:", jobJson)
 			sAdd(packageV1Set+"-json_decode_error", jobJson)
 			continue
 		}
 
-		path, ok := JobMap["path"]
+		path, ok := jobMap["path"]
 		if !ok {
-			fmt.Println(getProcessName(name, num), "package field not found: path")
+			fmt.Println(processName, "package field not found: path")
 			continue
 		}
 
-		hash, ok := JobMap["hash"]
+		hash, ok := jobMap["hash"]
 		if !ok {
-			fmt.Println(getProcessName(name, num), "package field not found: hash")
+			fmt.Println(processName, "package field not found: hash")
 			continue
 		}
 
-		key, ok := JobMap["key"]
+		key, ok := jobMap["key"]
 		if !ok {
-			fmt.Println(getProcessName(name, num), "package field not found: key")
+			fmt.Println(processName, "package field not found: key")
 			continue
 		}
 
-		resp, err := packagistGet(path, getProcessName(name, num))
+		content, err := ctx.packagist.GetPackage(path)
 		if err != nil {
 			syncHasError = true
-			fmt.Println(getProcessName(name, num), path, err.Error())
+			fmt.Println(processName, path, err.Error())
 			makeFailed(packageV1Set, path, err)
 			continue
 		}
 
-		if resp.StatusCode != 200 {
-			syncHasError = true
+		// if resp.StatusCode != 200 {
+		// 	syncHasError = true
 
-			// Make failed count
-			makeStatusCodeFailed(packageV1Set, resp.StatusCode, path)
+		// 	// Make failed count
+		// 	makeStatusCodeFailed(packageV1Set, resp.StatusCode, path)
 
-			// Push into failed queue to retry
-			if resp.StatusCode != 404 && resp.StatusCode != 410 {
-				sAdd(packageP1Queue, jobJson)
-			}
+		// 	// Push into failed queue to retry
+		// 	if resp.StatusCode != 404 && resp.StatusCode != 410 {
+		// 		sAdd(packageP1Queue, jobJson)
+		// 	}
 
-			continue
-		}
+		// 	continue
+		// }
 
-		content, err := ioutil.ReadAll(resp.Body)
-		_ = resp.Body.Close()
+		// content, err := ioutil.ReadAll(resp.Body)
+		// _ = resp.Body.Close()
 		if err != nil {
 			syncHasError = true
-			fmt.Println(getProcessName(name, num), path, err.Error())
+			fmt.Println(processName, path, err.Error())
 			continue
 		}
 
-		content, err = decode(content)
-		if err != nil {
-			syncHasError = true
-			fmt.Println("parseGzip Error", err.Error())
-			continue
-		}
+		// content, err = decode(content)
+		// if err != nil {
+		// 	syncHasError = true
+		// 	fmt.Println("parseGzip Error", err.Error())
+		// 	continue
+		// }
 
-		if !CheckHash(getProcessName(name, num), hash, content) {
+		if !CheckHash(processName, hash, content) {
 			syncHasError = true
 			continue
 		}
@@ -91,7 +90,7 @@ func packagesV1(name string, num int) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		err = putObject(getProcessName(name, num), path, bytes.NewReader(content), options...)
+		err = ctx.ossBucket.PutObject(path, bytes.NewReader(content), options...)
 		if err != nil {
 			syncHasError = true
 			fmt.Println("putObject Error", err.Error())
@@ -103,13 +102,13 @@ func packagesV1(name string, num int) {
 		err = json.Unmarshal(content, &distMap)
 		if err != nil {
 			syncHasError = true
-			fmt.Println(getProcessName(name, num), path, "Error parsing JSON", err.Error())
+			fmt.Println(processName, path, "Error parsing JSON", err.Error())
 			continue
 		}
 
 		hSet(packageV1Set, key, hash)
-		dispatchDists(distMap["packages"], getProcessName(name, num), packagistUrl(path))
-		cdnCache(path, name, num)
+		dispatchDists(distMap["packages"], processName, ctx.mirror.distUrl+path)
+		ctx.cdn.WarmUp(path)
 		countToday(packageV1SetHash, path)
 	}
 

@@ -1,8 +1,6 @@
 package main
 
-import (
-	"github.com/aliyun/packagist-mirror/util"
-)
+import "github.com/aliyun/packagist-mirror/util"
 
 func main() {
 	util.Execute()

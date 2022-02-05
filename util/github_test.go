@@ -7,7 +7,8 @@ import (
 )
 
 func TestGetDistFromGithub(t *testing.T) {
-	resp, err := GetDistFromGithub("https://api.github.com/repos/aliyun/openapi-sdk-php/zipball/08136b7752d37fde14c3c2d6cbaabcb1dfa9c297", "", "ua")
+	github := NewGithub("", "ua")
+	resp, err := github.GetDist("https://api.github.com/repos/aliyun/openapi-sdk-php/zipball/08136b7752d37fde14c3c2d6cbaabcb1dfa9c297")
 	assert.Nil(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Equal(t, "application/zip", resp.Header.Get("Content-Type"))

@@ -11,8 +11,6 @@
 
 Alibaba Cloud Packagist Mirror 是阿里云帮助 PHP 开发者加速安装 [Composer](https://getcomposer.org) 依赖包的开源系统。欢迎使用 [阿里云 Composer 全量镜像](https://developer.aliyun.com/composer)。
 
-
-
 ## 快速使用
 若要运行本系统，请在项目根目录下创建 `packagist.yml` 文件，并配置以下选项：
 > 为了安全，请不要将 `packagist.yml` 文件加入版本控制。

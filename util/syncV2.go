@@ -3,50 +3,33 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"strconv"
 	"time"
 )
 
 var lastTimestamp = ""
 
-func syncV2(processName string) {
+func (ctx *Context) SyncV2(processName string) {
 	for {
 		lastTimestamp = getLastTimestamp()
 		if lastTimestamp == "" {
-			initTimestamp(processName)
+			ctx.initTimestamp()
 			continue
 		}
-		getChangesAndUpdateTimestamp(processName)
+		ctx.getChangesAndUpdateTimestamp()
 		// Each cycle requires a time slot
-		time.Sleep(time.Duration(config.ApiIterationInterval) * time.Second)
+		time.Sleep(time.Duration(ctx.mirror.apiIterationInterval) * time.Second)
 	}
 }
 
-func getChangesAndUpdateTimestamp(processName string) {
-	url := "metadata/changes.json?since=" + lastTimestamp
+func (ctx *Context) getChangesAndUpdateTimestamp() {
 	// Get root file from repo
-	resp, err := packagistGetApi(url, getProcessName(processName, 1))
+	content, err := ctx.packagist.GetMetadataChanges(lastTimestamp)
 	if err != nil {
+		// TODO
 		return
 	}
-	// Status code must be 200
-	if resp.StatusCode != 200 {
-		return
-	}
-	// Read data stream from body
-	content, err := ioutil.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err != nil {
-		fmt.Println(getProcessName(processName, 1), packagistUrlApi(url), err.Error())
-		return
-	}
-	// Decode content if Gzip
-	content, err = decode(content)
-	if err != nil {
-		fmt.Println("parseGzip Error", err.Error())
-		return
-	}
+
 	// JSON Decode
 	changesJson := make(map[string]interface{})
 	err = json.Unmarshal(content, &changesJson)
@@ -60,33 +43,18 @@ func getChangesAndUpdateTimestamp(processName string) {
 	if timestampAPI == lastTimestamp {
 		return
 	}
-	dispatchChanges(changesJson["actions"], processName)
+	dispatchChanges(changesJson["actions"])
 	setLastTimestamp(timestampAPI)
 }
 
-func initTimestamp(processName string) {
+func (ctx *Context) initTimestamp() {
 	// Get root file from repo
-	resp, err := packagistGetApi("metadata/changes.json", getProcessName(processName, 1))
+	content, err := ctx.packagist.GetInitMetadataChanges()
 	if err != nil {
+		// TODO:
 		return
 	}
-	// Status code must be 400
-	if resp.StatusCode != 400 {
-		return
-	}
-	// Read data stream from body
-	content, err := ioutil.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err != nil {
-		fmt.Println(getProcessName(processName, 1), packagistUrlApi("metadata/changes.json"), err.Error())
-		return
-	}
-	// Decode content if Gzip
-	content, err = decode(content)
-	if err != nil {
-		fmt.Println("parseGzip Error", err.Error())
-		return
-	}
+
 	// JSON Decode
 	changesJson := make(map[string]interface{})
 	err = json.Unmarshal(content, &changesJson)
@@ -94,39 +62,27 @@ func initTimestamp(processName string) {
 		fmt.Println(err.Error())
 		return
 	}
-	syncAll(processName)
+
+	ctx.syncAll()
+
 	timestampAPI := strconv.FormatInt(int64(changesJson["timestamp"].(float64)), 10)
 	setLastTimestamp(timestampAPI)
 }
 
-func syncAll(processName string) {
+func (ctx *Context) syncAll() {
 	// Get root file from repo
-	resp, err := packagistGetApi("packages/list.json", getProcessName(processName, 1))
+	content, err := ctx.packagist.GetAllPackages()
+
 	if err != nil {
+		// TODO
 		return
 	}
-	// Status code must be 200
-	if resp.StatusCode != 200 {
-		return
-	}
-	// Read data stream from body
-	content, err := ioutil.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err != nil {
-		fmt.Println(getProcessName(processName, 1), packagistUrlApi("packages/list.json"), err.Error())
-		return
-	}
-	// Decode content if Gzip
-	content, err = decode(content)
-	if err != nil {
-		fmt.Println("parseGzip Error", err.Error())
-		return
-	}
+
 	// JSON Decode
 	list := make(map[string][]string)
 	err = json.Unmarshal(content, &list)
 	if err != nil {
-		fmt.Println(getProcessName(processName, 1), err.Error())
+		fmt.Println(err.Error())
 		return
 	}
 
@@ -146,7 +102,7 @@ func pushV2Queue(actionType string, packageName string, time string) {
 	sAdd(packageV2Queue, string(jsonV2))
 }
 
-func dispatchChanges(changes interface{}, name string) {
+func dispatchChanges(changes interface{}) {
 	for _, item := range changes.([]interface{}) {
 
 		actionType := item.(map[string]interface{})["type"].(string)
@@ -155,7 +111,7 @@ func dispatchChanges(changes interface{}, name string) {
 		if !hGetValue(packageV2Set, packageName, updateTime) {
 			pushV2Queue(actionType, packageName, updateTime)
 		} else {
-			fmt.Println(getProcessName(name, 1), "File is up to date:", packageName, updateTime)
+			fmt.Println("File is up to date:", packageName, updateTime)
 		}
 
 	}

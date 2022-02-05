@@ -3,14 +3,13 @@ package util
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"strconv"
 	"time"
+
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
-func status(name string, processNum int) {
-
-	processName := getProcessName(name, processNum)
+func (ctx *Context) SyncStatus(processName string) {
 
 	for {
 		time.Sleep(1 * time.Second)
@@ -39,17 +38,17 @@ func status(name string, processNum int) {
 		aliComposerLast, _ := time.Parse("2006-01-02 15:04:05", aliDateTime)
 		packagistLast, _ = time.Parse("2006-01-02 15:04:05", packagistDateTime)
 
-		Interval := int(aliComposerLast.In(Loc).Unix() - packagistLast.In(Loc).Unix())
+		interval := int(aliComposerLast.In(Loc).Unix() - packagistLast.In(Loc).Unix())
 		status["Delayed"] = 0
-		status["Interval"] = Interval
-		if Interval < 0 {
-			status["Title"] = "Delayed " + strconv.Itoa(-Interval) + " Seconds, waiting for updates..."
-			status["Delayed"] = -Interval
-			if -Interval >= 600 {
+		status["Interval"] = interval
+		if interval < 0 {
+			status["Title"] = "Delayed " + strconv.Itoa(-interval) + " Seconds, waiting for updates..."
+			status["Delayed"] = -interval
+			if -interval >= 600 {
 				status["ShouldReportDelay"] = true
 			}
 		} else {
-			status["Title"] = "Synchronized within " + strconv.Itoa(Interval) + " Seconds!"
+			status["Title"] = "Synchronized within " + strconv.Itoa(interval) + " Seconds!"
 			status["ShouldReportDelay"] = false
 		}
 
@@ -100,7 +99,7 @@ func status(name string, processNum int) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		_ = putObject(processName, "status.json", bytes.NewReader(ossStatusContent), options...)
+		_ = ctx.ossBucket.PutObject("status.json", bytes.NewReader(ossStatusContent), options...)
 	}
 
 }

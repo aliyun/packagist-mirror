@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"io/ioutil"
 	"time"
+
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
-func providers(name string, num int) {
+func (ctx *Context) SyncProviders(processName string) {
 
 	for {
 
@@ -28,60 +28,53 @@ func providers(name string, num int) {
 
 		path, ok := jobMap["path"]
 		if !ok {
-			fmt.Println(getProcessName(name, num), "provider field not found: path")
+			fmt.Println(processName, "provider field not found: path")
 			continue
 		}
 
 		hash, ok := jobMap["hash"]
 		if !ok {
-			fmt.Println(getProcessName(name, num), "provider field not found: hash")
+			fmt.Println(processName, "provider field not found: hash")
 			continue
 		}
 
 		key, ok := jobMap["key"]
 		if !ok {
-			fmt.Println(getProcessName(name, num), "provider field not found: key")
+			fmt.Println(processName, "provider field not found: key")
 			continue
 		}
 
-		resp, err := packagistGet(path, getProcessName(name, num))
+		content, err := ctx.packagist.GetAllPackages()
 		if err != nil {
 			syncHasError = true
-			fmt.Println(getProcessName(name, num), path, err.Error())
+			fmt.Println(processName, path, err.Error())
 			makeFailed(providerSet, path, err)
 			continue
 		}
 
-		if resp.StatusCode != 200 {
-			syncHasError = true
-			// Make failed count
-			makeStatusCodeFailed(providerSet, resp.StatusCode, path)
+		// if resp.StatusCode != 200 {
+		// 	syncHasError = true
+		// 	// Make failed count
+		// 	makeStatusCodeFailed(providerSet, resp.StatusCode, path)
 
-			// Push into failed queue to retry
-			if resp.StatusCode != 404 && resp.StatusCode != 410 {
-				pushProvider(key, path, hash, getProcessName(name, num))
-			}
+		// 	// Push into failed queue to retry
+		// 	if resp.StatusCode != 404 && resp.StatusCode != 410 {
+		// 		pushProvider(key, path, hash, processName)
+		// 	}
 
-			continue
-		}
+		// 	continue
+		// }
 
-		content, err := ioutil.ReadAll(resp.Body)
-		_ = resp.Body.Close()
+		// content, err := ioutil.ReadAll(resp.Body)
+		// _ = resp.Body.Close()
 		if err != nil {
 			syncHasError = true
-			fmt.Println(getProcessName(name, num), path, err.Error())
+			fmt.Println(processName, path, err.Error())
 			continue
 		}
 
-		content, err = decode(content)
-		if err != nil {
-			syncHasError = true
-			fmt.Println("parseGzip Error", err.Error())
-			continue
-		}
-
-		if !CheckHash(getProcessName(name, num), hash, content) {
-			pushProvider(key, path, hash, getProcessName(name, num))
+		if !CheckHash(processName, hash, content) {
+			pushProvider(key, path, hash, processName)
 			continue
 		}
 
@@ -89,7 +82,7 @@ func providers(name string, num int) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		err = putObject(getProcessName(name, num), path, bytes.NewReader(content), options...)
+		err = ctx.ossBucket.PutObject(path, bytes.NewReader(content), options...)
 		if err != nil {
 			syncHasError = true
 			fmt.Println("putObject Error", err.Error())
@@ -101,7 +94,7 @@ func providers(name string, num int) {
 		err = json.Unmarshal(content, &distMap)
 		if err != nil {
 			syncHasError = true
-			fmt.Println(getProcessName(name, num), path, err.Error())
+			fmt.Println(processName, path, err.Error())
 			errHandler(err)
 			continue
 		}
@@ -110,7 +103,7 @@ func providers(name string, num int) {
 
 		dispatchPackages(distMap["providers"])
 
-		cdnCache(path, name, num)
+		ctx.cdn.WarmUp(path)
 	}
 
 }
