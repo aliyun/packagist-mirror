@@ -23,6 +23,6 @@ func TestValidateConfig(t *testing.T) {
 	config.BuildCache = "build cache"
 	config.UserAgent = "ua"
 	config.ApiIterationInterval = 10
-	err := validateConfig(config)
+	err := config.ValidateConfig()
 	assert.Nil(t, err)
 }

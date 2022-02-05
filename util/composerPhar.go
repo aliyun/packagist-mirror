@@ -3,10 +3,9 @@ package util
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"io/ioutil"
 	"time"
+
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
 var versions = make(map[string][]stable)
@@ -18,27 +17,16 @@ type stable struct {
 	MinPhp  int    `json:"min-php"`
 }
 
-func composerPhar(name string, num int) {
+func (ctx *Context) SyncComposerPhar(processName string) {
 
 	for {
 		// Each cycle requires a time slot
 		time.Sleep(6000 * time.Second)
 
 		// Get latest stable version
-		versionUrl := "https://getcomposer.org/versions"
-		resp, err := get(versionUrl, getProcessName(name, num))
+		versionsContent, err := GetBody("https://getcomposer.org/versions")
 		if err != nil {
-			continue
-		}
-
-		if resp.StatusCode != 200 {
-			continue
-		}
-
-		versionsContent, err := ioutil.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if err != nil {
-			fmt.Println(getProcessName(name, num), versionUrl, err.Error())
+			// TODO: logger the error, but ignore it
 			continue
 		}
 
@@ -50,8 +38,10 @@ func composerPhar(name string, num int) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		err = putObject(getProcessName(name, num), "versions", bytes.NewReader(versionsContent), options...)
+
+		err = ctx.ossBucket.PutObject("versions", bytes.NewReader(versionsContent), options...)
 		if err != nil {
+			// TODO: logger the error, but ignore it
 			continue
 		}
 
@@ -66,38 +56,26 @@ func composerPhar(name string, num int) {
 		}
 
 		// Like https://getcomposer.org/download/1.9.1/composer.phar
-		phar, err := get("https://getcomposer.org"+versions["stable"][0].Path, getProcessName(name, num))
+		composerPhar, err := GetBody("https://getcomposer.org" + versions["stable"][0].Path)
 		if err != nil {
+			// TODO: logger the error, but ignore it
 			continue
 		}
 
-		if phar.StatusCode != 200 {
-			continue
-		}
-
-		composerPhar, err := ioutil.ReadAll(phar.Body)
-		_ = putObject(getProcessName(name, num), "composer.phar", bytes.NewReader(composerPhar))
-		_ = putObject(getProcessName(name, num), "download/"+versions["stable"][0].Version+"/composer.phar", bytes.NewReader(composerPhar))
-		_ = phar.Body.Close()
+		_ = ctx.ossBucket.PutObject("composer.phar", bytes.NewReader(composerPhar))
+		_ = ctx.ossBucket.PutObject("download/"+versions["stable"][0].Version+"/composer.phar", bytes.NewReader(composerPhar))
 
 		// Like https://getcomposer.org/download/1.9.1/composer.phar.sig
+		composerPharSig, err := GetBody("https://getcomposer.org" + versions["stable"][0].Path + ".sig")
+		if err != nil {
+			// TODO: logger the error, but ignore it
+			continue
+		}
 
 		options = []oss.Option{
 			oss.ContentType("application/json"),
 		}
-
-		sig, err := get("https://getcomposer.org"+versions["stable"][0].Path+".sig", getProcessName(name, num))
-		if err != nil {
-			continue
-		}
-
-		if sig.StatusCode != 200 {
-			continue
-		}
-
-		composerPharSig, err := ioutil.ReadAll(sig.Body)
-		_ = putObject(getProcessName(name, num), "composer.phar.sig", bytes.NewReader(composerPharSig), options...)
-		_ = putObject(getProcessName(name, num), "download/"+versions["stable"][0].Version+"/composer.phar.sig", bytes.NewReader(composerPharSig), options...)
-		_ = sig.Body.Close()
+		_ = ctx.ossBucket.PutObject("composer.phar.sig", bytes.NewReader(composerPharSig), options...)
+		_ = ctx.ossBucket.PutObject("download/"+versions["stable"][0].Version+"/composer.phar.sig", bytes.NewReader(composerPharSig), options...)
 	}
 }

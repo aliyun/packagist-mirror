@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func dists(name string, num int) {
+func (ctx *Context) SyncDists(processName string) {
 
 	for {
 		jobJson := sPop(distQueue)
@@ -15,12 +15,12 @@ func dists(name string, num int) {
 			continue
 		}
 
-		uploadDist(jobJson, name, num)
+		ctx.uploadDist(jobJson)
 	}
 
 }
 
-func distsRetry(name string, num int) {
+func (ctx *Context) SyncDistsRetry(processName string) {
 
 	for {
 		jobJson := sPop(distQueueRetry)
@@ -30,13 +30,12 @@ func distsRetry(name string, num int) {
 		}
 
 		time.Sleep(2 * time.Second)
-		uploadDist(jobJson, name, num)
+		ctx.uploadDist(jobJson)
 	}
 
 }
 
-func uploadDist(jobJson string, name string, num int) {
-
+func (ctx *Context) uploadDist(jobJson string) {
 	// Json decode
 	distMap := make(map[string]string)
 	err := json.Unmarshal([]byte(jobJson), &distMap)
@@ -48,13 +47,13 @@ func uploadDist(jobJson string, name string, num int) {
 	// Get information
 	path, ok := distMap["path"]
 	if !ok {
-		fmt.Println(getProcessName(name, num), "Dist field not found: path")
+		fmt.Println("Dist field not found: path")
 		return
 	}
 
 	url, ok := distMap["url"]
 	if !ok {
-		fmt.Println(getProcessName(name, num), "Dist field not found: url")
+		fmt.Println("Dist field not found: url")
 		return
 	}
 
@@ -62,17 +61,17 @@ func uploadDist(jobJson string, name string, num int) {
 	countToday(distSet, path)
 
 	// OSS IsObjectExist
-	if isObjectExist(getProcessName(name, num), path) {
+	if isExist, _ := ctx.ossBucket.IsObjectExist(path); isExist {
 		makeSucceed(distSet, path)
 		return
 	}
 
 	// Get dist
-	resp, err := GetDistFromGithub(url, config.GithubToken, config.UserAgent)
+	resp, err := ctx.github.GetDist(url)
 
 	if err != nil {
 		syncHasError = true
-		fmt.Println(getProcessName(name, num), path, err.Error())
+		fmt.Println(path, err.Error())
 		makeFailed(distSet, path, err)
 		return
 	}
@@ -88,7 +87,6 @@ func uploadDist(jobJson string, name string, num int) {
 		}
 
 		fmt.Println(
-			getProcessName(name, num),
 			"Dist Get Error",
 			resp.StatusCode,
 			jobJson,
@@ -96,13 +94,12 @@ func uploadDist(jobJson string, name string, num int) {
 		return
 	}
 	// Put into OSS
-	err = putObject(getProcessName(name, num), path, resp.Body)
+	err = ctx.ossBucket.PutObject(path, resp.Body)
 	if err != nil {
 		syncHasError = true
 		return
 	}
 
 	makeSucceed(distSet, path)
-
-	cdnCache(path, name, num)
+	ctx.cdn.WarmUp(path)
 }

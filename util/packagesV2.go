@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"io/ioutil"
 	"time"
+
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
-func packagesV2(name string, num int) {
+func (ctx *Context) SyncPackagesV2(processName string) {
 
 	for {
 		jobJson := sPop(packageV2Queue)
@@ -19,82 +19,67 @@ func packagesV2(name string, num int) {
 		}
 
 		// Json decode
-		JobMap := make(map[string]string)
-		err := json.Unmarshal([]byte(jobJson), &JobMap)
+		jobMap := make(map[string]string)
+		err := json.Unmarshal([]byte(jobJson), &jobMap)
 		if err != nil {
-			fmt.Println(getProcessName(name, num), "JSON Decode Error:", jobJson)
+			fmt.Println(processName, "JSON Decode Error:", jobJson)
 			sAdd(packageV2Set+"-json_decode_error", jobJson)
 			continue
 		}
 
-		actionType, ok := JobMap["type"]
+		actionType, ok := jobMap["type"]
 		if !ok {
-			fmt.Println(getProcessName(name, num), "package field not found: type")
+			fmt.Println(processName, "package field not found: type")
 			continue
 		}
 
 		if actionType == "update" {
-			updatePackageV2(JobMap, name, num)
+			ctx.updatePackageV2(jobMap)
 		}
 
 		if actionType == "delete" {
-			deletePackageV2(JobMap, name, num)
+			ctx.deletePackageV2(jobMap)
 		}
 
 	}
 
 }
 
-func updatePackageV2(JobMap map[string]string, name string, num int) {
-	packageName, ok := JobMap["package"]
+func (ctx *Context) updatePackageV2(jobMap map[string]string) {
+	packageName, ok := jobMap["package"]
 	if !ok {
-		fmt.Println(getProcessName(name, num), "package field not found: package")
+		fmt.Println("package field not found: package")
 		return
 	}
 
-	updateTime, ok := JobMap["time"]
+	updateTime, ok := jobMap["time"]
 	if !ok {
-		fmt.Println(getProcessName(name, num), "package field not found: time")
+		fmt.Println("package field not found: time")
 		return
 	}
 
-	path := "p2/" + packageName + ".json"
-	resp, err := packagistGet(path, getProcessName(name, num))
+	content, err := ctx.packagist.GetPackage(packageName)
 	if err != nil {
-		fmt.Println(getProcessName(name, num), path, err.Error())
-		makeFailed(packageV2Set, path, err)
+		makeFailed(packageV2Set, packageName, err)
 		return
 	}
 
-	if resp.StatusCode != 200 {
-		makeStatusCodeFailed(packageV2Set, resp.StatusCode, path)
-		return
-	}
-
-	content, err := ioutil.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err != nil {
-		fmt.Println(getProcessName(name, num), path, err.Error())
-		return
-	}
-
-	content, err = decode(content)
-	if err != nil {
-		fmt.Println("parseGzip Error", err.Error())
-		return
-	}
+	// if resp.StatusCode != 200 {
+	// 	makeStatusCodeFailed(packageV2Set, resp.StatusCode, path)
+	// 	return
+	// }
 
 	// JSON Decode
 	packageJson := make(map[string]interface{})
 	err = json.Unmarshal(content, &packageJson)
 	if err != nil {
-		fmt.Println(getProcessName(name, num), "JSON Decode Error:", path)
+		fmt.Println("JSON Decode Error:", packageName)
 		return
 	}
 
 	_, ok = packageJson["minified"]
 	if !ok {
-		fmt.Println(getProcessName(name, num), "package field not found: minified")
+		fmt.Println("package field not found: minified")
 		return
 	}
 
@@ -102,7 +87,8 @@ func updatePackageV2(JobMap map[string]string, name string, num int) {
 	options := []oss.Option{
 		oss.ContentType("application/json"),
 	}
-	err = putObject(getProcessName(name, num), path, bytes.NewReader(content), options...)
+	path := "p2/" + packageName + ".json"
+	err = ctx.ossBucket.PutObject(path, bytes.NewReader(content), options...)
 	if err != nil {
 		syncHasError = true
 		fmt.Println("putObject Error", err.Error())
@@ -111,18 +97,18 @@ func updatePackageV2(JobMap map[string]string, name string, num int) {
 
 	hSet(packageV2Set, packageName, updateTime)
 
-	cdnCache(path, name, num)
+	ctx.cdn.WarmUp(path)
 }
 
-func deletePackageV2(JobMap map[string]string, name string, num int) {
-	packageName, ok := JobMap["package"]
+func (ctx *Context) deletePackageV2(jobMap map[string]string) {
+	packageName, ok := jobMap["package"]
 	if !ok {
-		fmt.Println(getProcessName(name, num), "package field not found: package")
+		fmt.Println("package field not found: package")
 		return
 	}
 
 	path := "p2/" + packageName + ".json"
 
 	hDel(packageV2Set, packageName)
-	deleteObject(getProcessName(name, num), path)
+	ctx.ossBucket.DeleteObject(path)
 }

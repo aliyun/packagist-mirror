@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"io/ioutil"
 	"strings"
 	"time"
+
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
 var packagesJson = make(map[string]interface{})
@@ -15,33 +15,27 @@ var packagesContentCache []byte
 var packagistLastModified = ""
 var syncHasError = false
 
-func packagesJsonFile(name string) {
+func (ctx *Context) SyncPackagesJsonFile(processName string) {
 
 	for {
 		// Each cycle requires a time slot
 		time.Sleep(1 * time.Second)
 
 		// Get root file from packagist repo
-		resp, err := packagistGet("packages.json", getProcessName(name, 1))
+		packagistContent, err := ctx.packagist.GetPackagesJSON()
 		if err != nil {
 			sAdd(packagesJsonKey+"-Get", "packages.json")
 			continue
 		}
 
 		// Status code must be 200
-		if resp.StatusCode != 200 {
-			makeStatusCodeFailed(packagesJsonKey, resp.StatusCode, packagistUrl("packages.json"))
-			continue
-		}
+		// if resp.StatusCode != 200 {
+		// 	makeStatusCodeFailed(packagesJsonKey, resp.StatusCode, config.GetPackagistUrl("packages.json"))
+		// 	continue
+		// }
 
-		// Get Last-Modified field
-		packagistLastModified = resp.Header["Last-Modified"][0]
-
-		// Read data stream from body
-		packagistContent, err := ioutil.ReadAll(resp.Body)
-		_ = resp.Body.Close()
 		if err != nil {
-			fmt.Println(getProcessName(name, 1), packagistUrl("packages.json"), err.Error())
+			fmt.Println(err.Error())
 			continue
 		}
 
@@ -67,7 +61,7 @@ func packagesJsonFile(name string) {
 		syncHasError = false
 
 		// Dispatch providers
-		dispatchProviders(packagesJson["provider-includes"], name)
+		ctx.dispatchProviders(packagesJson["provider-includes"], processName)
 
 		for {
 			// If all tasks are completed, skip the loop and update the file
@@ -75,22 +69,22 @@ func packagesJsonFile(name string) {
 			if left == 0 {
 				break
 			}
-			fmt.Println(getProcessName(name, 1), "Processing:", left, ", Check again in 1 second. ")
+			fmt.Println(processName, "Processing:", left, ", Check again in 1 second. ")
 			time.Sleep(1 * time.Second)
 		}
 
 		if syncHasError == true {
-			fmt.Println(getProcessName(name, 1), "There is an error in this synchronization. We look forward to the next synchronization...")
+			fmt.Println(processName, "There is an error in this synchronization. We look forward to the next synchronization...")
 			continue
 		}
 
 		// Update `packages.json`
 		packagesJson["last-update"] = time.Now().Format("2006-01-02 15:04:05")
-		packagesJson["metadata-url"] = config.ProviderUrl + "p2/%package%.json"
-		packagesJson["providers-url"] = config.ProviderUrl + "p/%package%$%hash%.json"
+		packagesJson["metadata-url"] = ctx.mirror.providerUrl + "p2/%package%.json"
+		packagesJson["providers-url"] = ctx.mirror.providerUrl + "p/%package%$%hash%.json"
 		packagesJson["mirrors"] = []map[string]interface{}{
 			{
-				"dist-url":  config.DistUrl + "dists/%package%/%reference%.%type%",
+				"dist-url":  ctx.mirror.distUrl + "dists/%package%/%reference%.%type%",
 				"preferred": true,
 			},
 		}
@@ -102,7 +96,7 @@ func packagesJsonFile(name string) {
 		options := []oss.Option{
 			oss.ContentType("application/json"),
 		}
-		err = putObject(getProcessName(name, 1), "packages.json", bytes.NewReader(packagesJsonNew), options...)
+		err = ctx.ossBucket.PutObject("packages.json", bytes.NewReader(packagesJsonNew), options...)
 		if err != nil {
 			continue
 		}
@@ -113,7 +107,7 @@ func packagesJsonFile(name string) {
 
 }
 
-func dispatchProviders(distMap interface{}, name string) {
+func (ctx *Context) dispatchProviders(distMap interface{}, name string) {
 
 	for provider, value := range distMap.(map[string]interface{}) {
 
@@ -125,9 +119,8 @@ func dispatchProviders(distMap interface{}, name string) {
 			if !hGetValue(providerSet, provider, providerHash) {
 				pushProvider(provider, providerPath, providerHash, getProcessName(name, 1))
 			} else {
-				fmt.Println(getProcessName(name, 1), "Already succeed", mirrorUrl(providerPath))
+				fmt.Println(getProcessName(name, 1), "Already succeed")
 			}
-
 		}
 
 	}
