@@ -81,7 +81,8 @@ func (ctx *Context) SyncPackagesV1(processName string) {
 		// 	continue
 		// }
 
-		if !CheckHash(processName, hash, content) {
+		if sum := getSha256Sum(content); sum != hash {
+			fmt.Println(processName, "Wrong Hash", "Original:", hash, "Current:", sum)
 			syncHasError = true
 			continue
 		}

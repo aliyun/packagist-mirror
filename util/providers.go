@@ -73,7 +73,8 @@ func (ctx *Context) SyncProviders(processName string) {
 			continue
 		}
 
-		if !CheckHash(processName, hash, content) {
+		if sum := getSha256Sum(content); sum != hash {
+			fmt.Println(processName, "Wrong Hash", "Original:", hash, "Current:", sum)
 			p := make(map[string]interface{})
 			p["key"] = key
 			p["path"] = path
@@ -100,7 +101,6 @@ func (ctx *Context) SyncProviders(processName string) {
 		if err != nil {
 			syncHasError = true
 			fmt.Println(processName, path, err.Error())
-			errHandler(err)
 			continue
 		}
 
