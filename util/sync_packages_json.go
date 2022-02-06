@@ -85,24 +85,41 @@ func syncPackagesJsonFile(ctx *Context, logger *log.Logger) (err error) {
 			ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
 			ctx.redis.SAdd(getTodayKey(providerSet), providerHash).Result()
 			ctx.redis.ExpireAt(getTodayKey(providerSet), getTomorrow()).Result()
-		} else {
-			fmt.Println("Already succeed")
 		}
 	}
 
 	for {
 		// If all tasks are completed, skip the loop and update the file
-		left := sCard(distQueue) + sCard(providerQueue) + sCard(packageP1Queue) + sCard(packageV2Queue)
+		distQueueSize, err1 := ctx.redis.SCard(distQueue).Result()
+		if err1 != nil {
+			err = fmt.Errorf("get distQueue size: " + err1.Error())
+			return
+		}
+
+		providerQueueSize, err1 := ctx.redis.SCard(providerQueue).Result()
+		if err1 != nil {
+			err = fmt.Errorf("get providerQueue size: " + err1.Error())
+			return
+		}
+
+		packageP1QueueSize, err1 := ctx.redis.SCard(packageP1Queue).Result()
+		if err1 != nil {
+			err = fmt.Errorf("get packageP1Queue size: " + err1.Error())
+			return
+		}
+
+		packageV2QueueSize, err1 := ctx.redis.SCard(packageV2Queue).Result()
+		if err1 != nil {
+			err = fmt.Errorf("get packageV2Queue size: " + err1.Error())
+			return
+		}
+
+		left := distQueueSize + providerQueueSize + packageP1QueueSize + packageV2QueueSize
 		if left == 0 {
 			break
 		}
 		fmt.Println("Processing:", left, ", Check again in 1 second. ")
 		time.Sleep(1 * time.Second)
-	}
-
-	if syncHasError == true {
-		err = fmt.Errorf("There is an error in this synchronization. We look forward to the next synchronization...")
-		return
 	}
 
 	// Update `packages.json`

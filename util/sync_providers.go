@@ -104,10 +104,8 @@ func (ctx *Context) SyncProviders(processName string) {
 			continue
 		}
 
-		hSet(providerSet, key, hash)
-
+		ctx.redis.HSet(providerSet, key, hash).Err()
 		dispatchPackages(distMap["providers"])
-
 		ctx.cdn.WarmUp(path)
 	}
 

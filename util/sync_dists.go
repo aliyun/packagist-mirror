@@ -1,61 +1,66 @@
 package util
 
 import (
-	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"time"
 )
 
 func (ctx *Context) SyncDists(processName string) {
-
+	var logger = log.New(os.Stderr, processName, log.LUTC)
 	for {
-		jobJson := sPop(distQueue)
+		jobJson, err := ctx.redis.SPop(distQueue).Result()
+		if err != nil {
+			logger.Println("pop from queue(" + distQueue + ") failed")
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
 		if jobJson == "" {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		ctx.uploadDist(jobJson)
+		dist, err := NewDistFromJSONString(jobJson)
+		if err != nil {
+			logger.Println("Covert to Dist failed: " + jobJson)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		uploadDist(ctx, dist)
 	}
 
 }
 
 func (ctx *Context) SyncDistsRetry(processName string) {
-
+	var logger = log.New(os.Stderr, processName, log.LUTC)
 	for {
-		jobJson := sPop(distQueueRetry)
+		jobJson, err := ctx.redis.SPop(distQueueRetry).Result()
 		if jobJson == "" {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
 		time.Sleep(2 * time.Second)
-		ctx.uploadDist(jobJson)
+
+		dist, err := NewDistFromJSONString(jobJson)
+		if err != nil {
+			logger.Println("Covert to Dist failed: " + jobJson)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		uploadDist(ctx, dist)
 	}
 
 }
 
-func (ctx *Context) uploadDist(jobJson string) {
-	// Json decode
-	distMap := make(map[string]string)
-	err := json.Unmarshal([]byte(jobJson), &distMap)
-	if err != nil {
-		// TODO
-		return
-	}
-
+func uploadDist(ctx *Context, job *Dist) (err error) {
 	// Get information
-	path, ok := distMap["path"]
-	if !ok {
-		fmt.Println("Dist field not found: path")
-		return
-	}
-
-	url, ok := distMap["url"]
-	if !ok {
-		fmt.Println("Dist field not found: url")
-		return
-	}
+	path := job.Path
+	url := job.Url
 
 	// Count
 	countToday(distSet, path)
@@ -83,16 +88,12 @@ func (ctx *Context) uploadDist(jobJson string) {
 
 		// Push into failed queue to retry
 		if resp.StatusCode != 404 && resp.StatusCode != 410 {
-			sAdd(distQueueRetry, jobJson)
+			sAdd(distQueueRetry, job.ToJSONString())
 		}
 
-		fmt.Println(
-			"Dist Get Error",
-			resp.StatusCode,
-			jobJson,
-		)
 		return
 	}
+
 	// Put into OSS
 	err = ctx.ossBucket.PutObject(path, resp.Body)
 	if err != nil {
@@ -102,4 +103,5 @@ func (ctx *Context) uploadDist(jobJson string) {
 
 	makeSucceed(distSet, path)
 	ctx.cdn.WarmUp(path)
+	return
 }
