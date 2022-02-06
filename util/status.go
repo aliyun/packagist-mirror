@@ -26,8 +26,8 @@ func (ctx *Context) SyncStatus(processName string) {
 		}
 
 		// Format: 2006-01-02 15:04:05
-		aliDateTime, ok := packagesJson["last-update"].(string)
-		if !ok {
+		aliDateTime, err := ctx.redis.Get(lastUpdateTimeKey).Result()
+		if err != nil {
 			continue
 		}
 

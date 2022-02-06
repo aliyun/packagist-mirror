@@ -49,23 +49,10 @@ func (ctx *Context) getChangesAndUpdateTimestamp() {
 
 func (ctx *Context) initTimestamp() {
 	// Get root file from repo
-	content, err := ctx.packagist.GetInitMetadataChanges()
-	if err != nil {
-		// TODO:
-		return
-	}
-
-	// JSON Decode
-	changesJson := make(map[string]interface{})
-	err = json.Unmarshal(content, &changesJson)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
 
 	ctx.syncAll()
 
-	timestampAPI := strconv.FormatInt(int64(changesJson["timestamp"].(float64)), 10)
+	timestampAPI, _ := ctx.packagist.GetInitTimestamp()
 	setLastTimestamp(timestampAPI)
 }
 
