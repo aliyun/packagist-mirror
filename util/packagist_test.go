@@ -13,6 +13,7 @@ func TestGetPackagesJSON(t *testing.T) {
 	pkg, err := getPackages(body)
 	assert.Nil(t, err)
 	assert.Equal(t, "https://packagist.org/downloads/", pkg.NotifyBatch)
+	assert.Greater(t, len(pkg.ProviderIncludes), 0)
 }
 
 func TestGetInitTimestamp(t *testing.T) {

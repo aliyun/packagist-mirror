@@ -70,33 +70,33 @@ func Execute() {
 	// Synchronize packages.json
 	go ctx.SyncPackagesJsonFile("PackagesJson")
 
-	// // Synchronize Meta for V2
-	// go ctx.SyncV2("SyncV2")
+	// Synchronize Meta for V2
+	go ctx.SyncV2("SyncV2")
 
 	// Update status
 	go ctx.SyncStatus("Status")
 
 	Wg.Add(1)
 
-	// for i := 0; i < 12; i++ {
-	// 	go ctx.SyncProviders(fmt.Sprintf("SyncProvider[%d]", i))
-	// }
+	for i := 0; i < 12; i++ {
+		go ctx.SyncProviders(fmt.Sprintf("SyncProvider[%d]", i))
+	}
 
-	// for i := 0; i < 10; i++ {
-	// 	go ctx.SyncPackagesV1(fmt.Sprintf("SyncPackagesV1[%d]", i))
-	// }
+	for i := 0; i < 10; i++ {
+		go ctx.SyncPackagesV1(fmt.Sprintf("SyncPackagesV1[%d]", i))
+	}
 
-	// for i := 0; i < 10; i++ {
-	// 	go ctx.SyncPackagesV2(fmt.Sprintf("SyncPackagesV2[%d]", i))
-	// }
+	for i := 0; i < 10; i++ {
+		go ctx.SyncPackagesV2(fmt.Sprintf("SyncPackagesV2[%d]", i))
+	}
 
-	// // Sync the dists
-	// for i := 0; i < 30; i++ {
-	// 	go ctx.SyncDists(fmt.Sprintf("SyncDists[%d]", i))
-	// }
+	// Sync the dists
+	for i := 0; i < 30; i++ {
+		go ctx.SyncDists(fmt.Sprintf("SyncDists[%d]", i))
+	}
 
-	// // Re-Sync the failed dists
-	// for i := 0; i < 1; i++ {
-	// 	go ctx.SyncDistsRetry(fmt.Sprintf("DistsRetry[%d]", i))
-	// }
+	// Re-Sync the failed dists
+	for i := 0; i < 1; i++ {
+		go ctx.SyncDistsRetry(fmt.Sprintf("DistsRetry[%d]", i))
+	}
 }
