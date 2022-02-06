@@ -74,7 +74,12 @@ func (ctx *Context) SyncProviders(processName string) {
 		}
 
 		if !CheckHash(processName, hash, content) {
-			pushProvider(key, path, hash, processName)
+			p := make(map[string]interface{})
+			p["key"] = key
+			p["path"] = path
+			p["hash"] = hash
+			jsonP2, _ := json.Marshal(p)
+			ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
 			continue
 		}
 
