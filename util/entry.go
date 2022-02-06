@@ -25,7 +25,8 @@ const (
 	packageP1Queue = "queue:packagesV1"
 	packageV2Queue = "queue:packagesV2"
 
-	lastUpdateTimeKey = "status:last-update"
+	lastUpdateTimeKey          = "status:last-update"
+	localStableComposerVersion = "status:local-stable-composer-version"
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 func Execute() {
 
 	if len(os.Args) != 2 {
-		panic("Must pass into `packagist.yml` configurations")
+		panic("must pass into `packagist.yml` configurations")
 	}
 
 	configPath := os.Args[1]
@@ -45,7 +46,7 @@ func Execute() {
 	if path.IsAbs(configPath) != true {
 		wd, err := os.Getwd()
 		if err != nil {
-			panic("Working Directory is not existing")
+			panic("working directory is not existing")
 		}
 		configPath = path.Join(wd, configPath)
 	}
@@ -56,7 +57,7 @@ func Execute() {
 		panic("load configuration error: " + err.Error())
 	}
 
-	fmt.Printf("Load configurations successfully(%s)\n", configPath)
+	fmt.Printf("load configurations successfully(%s)\n", configPath)
 
 	// Init context
 	ctx, err := NewContext(conf)

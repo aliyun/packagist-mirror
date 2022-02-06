@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 func getSha256Sum(content []byte) string {
@@ -35,4 +36,14 @@ func GetBody(url string) (body []byte, err error) {
 
 	body, err = ioutil.ReadAll(resp.Body)
 	return
+}
+
+func getTomorrow() time.Time {
+	timeStr := time.Now().Format("2006-01-02")
+	t2, _ := time.ParseInLocation("2006-01-02", timeStr, time.Local)
+	return t2.AddDate(0, 0, 1)
+}
+
+func getTodayKey(key string) string {
+	return key + "-" + time.Now().Format("2006-01-02")
 }

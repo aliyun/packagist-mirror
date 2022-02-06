@@ -3,7 +3,6 @@ package util
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/go-redis/redis"
 )
@@ -17,16 +16,6 @@ func countAll(key, member string) {
 func countToday(key, member string) {
 	sAdd(getTodayKey(key), member)
 	redisClient.ExpireAt(getTodayKey(key), getTomorrow())
-}
-
-func getTomorrow() time.Time {
-	timeStr := time.Now().Format("2006-01-02")
-	t2, _ := time.ParseInLocation("2006-01-02", timeStr, time.Local)
-	return t2.AddDate(0, 0, 1)
-}
-
-func getTodayKey(key string) string {
-	return key + "-" + time.Now().Format("2006-01-02")
 }
 
 func sAdd(key string, member string) {
