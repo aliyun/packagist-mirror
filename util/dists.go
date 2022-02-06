@@ -40,7 +40,7 @@ func (ctx *Context) uploadDist(jobJson string) {
 	distMap := make(map[string]string)
 	err := json.Unmarshal([]byte(jobJson), &distMap)
 	if err != nil {
-		errHandler(err)
+		// TODO
 		return
 	}
 
