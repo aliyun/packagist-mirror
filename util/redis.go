@@ -51,10 +51,6 @@ func sCard(key string) int64 {
 	return num
 }
 
-func hSet(key string, field string, content string) {
-	redisClient.HSet(key, field, content)
-}
-
 func hDel(key string, field string) {
 	redisClient.HDel(key, field)
 }
@@ -91,7 +87,7 @@ func makeSucceed(key string, field string) {
 
 func makeFailed(key string, field string, err error) {
 	key += "-failed"
-	hSet(key, field, err.Error())
+	// hSet(key, field, err.Error())
 }
 
 func removeFailed(key string, field string) {

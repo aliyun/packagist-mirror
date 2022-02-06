@@ -12,52 +12,35 @@ import (
 func (ctx *Context) SyncPackagesV2(processName string) {
 
 	for {
-		jobJson := sPop(packageV2Queue)
-		if jobJson == "" {
+		jobJson, err := ctx.redis.SPop(packageV2Queue).Result()
+		if err != nil {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
 		// Json decode
-		jobMap := make(map[string]string)
-		err := json.Unmarshal([]byte(jobJson), &jobMap)
+		action, err := NewChangeActionFromJSONString(jobJson)
 		if err != nil {
-			fmt.Println(processName, "JSON Decode Error:", jobJson)
-			sAdd(packageV2Set+"-json_decode_error", jobJson)
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		actionType, ok := jobMap["type"]
-		if !ok {
-			fmt.Println(processName, "package field not found: type")
-			continue
-		}
+		actionType := action.Type
 
 		if actionType == "update" {
-			ctx.updatePackageV2(jobMap)
+			updatePackageV2(ctx, action)
 		}
 
 		if actionType == "delete" {
-			ctx.deletePackageV2(jobMap)
+			deletePackageV2(ctx, action)
 		}
 
 	}
 
 }
 
-func (ctx *Context) updatePackageV2(jobMap map[string]string) {
-	packageName, ok := jobMap["package"]
-	if !ok {
-		fmt.Println("package field not found: package")
-		return
-	}
-
-	updateTime, ok := jobMap["time"]
-	if !ok {
-		fmt.Println("package field not found: time")
-		return
-	}
-
+func updatePackageV2(ctx *Context, action *ChangeAction) (err error) {
+	packageName := action.Package
 	content, err := ctx.packagist.GetPackage(packageName)
 	if err != nil {
 		makeFailed(packageV2Set, packageName, err)
@@ -77,7 +60,7 @@ func (ctx *Context) updatePackageV2(jobMap map[string]string) {
 		return
 	}
 
-	_, ok = packageJson["minified"]
+	_, ok := packageJson["minified"]
 	if !ok {
 		fmt.Println("package field not found: minified")
 		return
@@ -95,20 +78,23 @@ func (ctx *Context) updatePackageV2(jobMap map[string]string) {
 		return
 	}
 
-	hSet(packageV2Set, packageName, updateTime)
-
-	ctx.cdn.WarmUp(path)
-}
-
-func (ctx *Context) deletePackageV2(jobMap map[string]string) {
-	packageName, ok := jobMap["package"]
-	if !ok {
-		fmt.Println("package field not found: package")
+	_, err = ctx.redis.HSet(packageV2Set, packageName, action.Time).Result()
+	if err != nil {
 		return
 	}
 
-	path := "p2/" + packageName + ".json"
+	ctx.cdn.WarmUp(path)
+	return
+}
 
-	hDel(packageV2Set, packageName)
-	ctx.ossBucket.DeleteObject(path)
+func deletePackageV2(ctx *Context, action *ChangeAction) (err error) {
+	packageName := action.Package
+	path := "p2/" + packageName + ".json"
+	err = ctx.ossBucket.DeleteObject(path)
+	if err != nil {
+		return
+	}
+
+	_, err = ctx.redis.HDel(packageV2Set, packageName).Result()
+	return
 }

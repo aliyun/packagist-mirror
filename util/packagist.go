@@ -34,9 +34,15 @@ func (packagist *Packagist) GetPackagesJSON() (content []byte, err error) {
 	return
 }
 
-func (packagist *Packagist) GetMetadataChanges(lastTimestamp string) (content []byte, err error) {
+func (packagist *Packagist) GetMetadataChanges(lastTimestamp string) (changes Changes, err error) {
 	url := packagist.apiUrl + "metadata/changes.json?since=" + lastTimestamp
-	content, err = GetBody(url)
+	content, err := GetBody(url)
+	if err != nil {
+		return
+	}
+
+	// JSON Decode
+	err = json.Unmarshal(content, &changes)
 	return
 }
 

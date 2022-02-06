@@ -1,7 +1,9 @@
 package util
 
 import (
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -21,6 +23,13 @@ func TestGetInitTimestamp(t *testing.T) {
 	timestamp, err := p.GetInitTimestamp()
 	assert.Nil(t, err)
 	assert.NotNil(t, timestamp)
+}
+
+func TestGetChanges(t *testing.T) {
+	p := NewPackagist("https://packagist.org/", "https://packagist.org/")
+	changes, err := p.GetMetadataChanges(strconv.FormatInt(time.Now().UnixMilli()*10-2000, 10))
+	assert.Nil(t, err)
+	assert.NotNil(t, changes.Timestamp)
 }
 
 // func TestGetAllPackages(t *testing.T) {

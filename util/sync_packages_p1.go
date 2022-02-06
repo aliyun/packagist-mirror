@@ -107,15 +107,15 @@ func (ctx *Context) SyncPackagesV1(processName string) {
 			continue
 		}
 
-		hSet(packageV1Set, key, hash)
-		dispatchDists(distMap["packages"], processName, ctx.mirror.distUrl+path)
+		ctx.redis.HSet(packageV1Set, key, hash).Err()
+		dispatchDists(ctx, distMap["packages"], processName, ctx.mirror.distUrl+path)
 		ctx.cdn.WarmUp(path)
 		countToday(packageV1SetHash, path)
 	}
 
 }
 
-func dispatchDists(packages interface{}, processName string, path string) {
+func dispatchDists(ctx *Context, packages interface{}, processName string, path string) {
 
 	list, ok := packages.(map[string]interface{})
 	if !ok {
@@ -179,15 +179,11 @@ func dispatchDists(packages interface{}, processName string, path string) {
 				path := "dists/" + packageName + "/" + distContent["reference"].(string) + "." + distContent["type"].(string)
 
 				if !sIsMember(distSet, path) {
-					distJob := make(map[string]interface{})
-					distJob["path"] = path
-					distJob["url"] = distContent["url"]
-					jsonString, _ := json.Marshal(distJob)
-					sAdd(distQueue, string(jsonString))
+					dist := NewDist(path, distContent["url"].(string))
+					ctx.redis.SAdd(distQueue, dist.ToJSONString())
 					countAll(versionsSet, distName)
 					countToday(versionsSet, distName)
 				}
-
 			}
 
 		}
