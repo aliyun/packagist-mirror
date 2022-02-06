@@ -28,14 +28,6 @@ type Config struct {
 	ApiIterationInterval int    `yaml:"API_ITERATION_INTERVAL"`
 }
 
-func (config *Config) GetMirrorUrl(path string) string {
-	return config.MirrorUrl + path
-}
-
-func (config *Config) GetPackagistUrl(url string) string {
-	return config.RepoUrl + url
-}
-
 func LoadConfig(configPath string) (conf *Config, err error) {
 	content, err := getYamlContent(configPath)
 	if err != nil {

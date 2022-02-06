@@ -6,8 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCDN(t *testing.T) {
+func TestCDNWithFalse(t *testing.T) {
 	cdn := NewCDN(false, "https://mirrors.aliyun.com/composer/")
+	err := cdn.WarmUp("p2/alibabacloud/sdk.json")
+	assert.Nil(t, err)
+}
+
+func TestCDNWithTrue(t *testing.T) {
+	cdn := NewCDN(true, "https://mirrors.aliyun.com/composer/")
 	err := cdn.WarmUp("p2/alibabacloud/sdk.json")
 	assert.Nil(t, err)
 }
