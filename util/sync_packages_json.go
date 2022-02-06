@@ -12,7 +12,6 @@ import (
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
-var packagesContentCache []byte
 var packagistLastModified = ""
 var syncHasError = false
 
@@ -47,7 +46,15 @@ func syncPackagesJsonFile(ctx *Context, logger *log.Logger) (err error) {
 		return
 	}
 
-	if bytes.Equal(packagesContentCache, packagistContent) {
+	localPackagesJsonSum, err := ctx.redis.Get(packagesJsonKey).Result()
+	if err != nil {
+		err = fmt.Errorf("get local packages.json sum failed: " + err.Error())
+		return
+	}
+
+	sum := getSha256Sum(packagistContent)
+	if localPackagesJsonSum == sum {
+		// packages.json is not changed
 		return
 	}
 
@@ -58,22 +65,26 @@ func syncPackagesJsonFile(ctx *Context, logger *log.Logger) (err error) {
 		return
 	}
 
-	// Make error false
-	syncHasError = false
-
 	// Dispatch providers
 	for provider, hashValue := range packagesJson.ProviderIncludes {
 		providerHash := hashValue.SHA256
 		providerPath := strings.Replace(provider, "%hash%", providerHash, -1)
 
-		if !hGetValue(providerSet, provider, providerHash) {
+		value, err2 := ctx.redis.HGet(providerSet, provider).Result()
+		if err2 != nil {
+			err = fmt.Errorf("get provider set with key(%s) failed: "+err2.Error(), provider)
+			return
+		}
+
+		if value != providerHash {
 			p := make(map[string]interface{})
 			p["key"] = provider
 			p["path"] = providerPath
 			p["hash"] = providerHash
 			jsonP2, _ := json.Marshal(p)
 			ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
-			countToday(providerSet, providerHash)
+			ctx.redis.SAdd(getTodayKey(providerSet), providerHash).Result()
+			ctx.redis.ExpireAt(getTodayKey(providerSet), getTomorrow()).Result()
 		} else {
 			fmt.Println("Already succeed")
 		}
@@ -126,7 +137,12 @@ func syncPackagesJsonFile(ctx *Context, logger *log.Logger) (err error) {
 		return
 	}
 
-	// The cache is updated only if the push is successful
-	packagesContentCache = packagistContent
+	// save local packages.json sum to redis
+	err = ctx.redis.Set(packagesJsonKey, sum, 0).Err()
+	if err != nil {
+		err = fmt.Errorf("save local packages.json sum failed: " + err.Error())
+		return
+	}
+
 	return
 }

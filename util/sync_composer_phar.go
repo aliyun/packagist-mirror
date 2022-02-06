@@ -11,8 +11,6 @@ import (
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
-var versionsContentCache string
-
 type Stable struct {
 	Path    string `json:"path"`
 	Version string `json:"version"`
@@ -24,7 +22,6 @@ func (ctx *Context) SyncComposerPhar(processName string) {
 
 	fmt.Println("init sync composer.phar")
 	for {
-		// TODO: store the latest stable version into redis
 		err := syncComposerPhar(ctx)
 		if err != nil {
 			logger.Println("Sync composer.phar failed: " + err.Error())
@@ -53,7 +50,14 @@ func syncComposerPhar(ctx *Context) (err error) {
 
 	stable := versions["stable"][0]
 
-	if versionsContentCache == stable.Version {
+	localStableVersion, err := ctx.redis.Get(localStableComposerVersion).Result()
+	if err != nil {
+		err = fmt.Errorf("get local stable composer version: " + err.Error())
+		return
+	}
+
+	if localStableVersion == stable.Version {
+		// no need to anything
 		return
 	}
 
@@ -116,6 +120,11 @@ func syncComposerPhar(ctx *Context) (err error) {
 	}
 
 	// The cache is updated only if the push is successful
-	versionsContentCache = stable.Version
+	err = ctx.redis.Set(localStableComposerVersion, stable.Version, 0).Err()
+	if err != nil {
+		err = fmt.Errorf("save stable composer version failed: " + err.Error())
+		return
+	}
+
 	return
 }
