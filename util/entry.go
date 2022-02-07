@@ -25,14 +25,40 @@ const (
 	packageP1Queue = "queue:packagesV1"
 	packageV2Queue = "queue:packagesV2"
 
-	lastUpdateTimeKey          = "status:last-update"
+	lastUpdateTimeKey          = "key:last-update"
 	localStableComposerVersion = "status:local-stable-composer-version"
+	v2LastUpdateTimeKey        = "key:v2-lastTimestamp"
 )
 
 var (
 	// Wg Concurrency control
 	Wg sync.WaitGroup
 )
+
+func Test(ctx *Context) (err error) {
+	_, err = ctx.redis.Ping().Result()
+	if err != nil {
+		return
+	}
+
+	fmt.Println("[✓] test redis passed")
+
+	err = ctx.github.Test()
+	if err != nil {
+		return
+	}
+
+	fmt.Println("[✓] test github passed")
+
+	_, err = ctx.ossBucket.ListObjects()
+	if err != nil {
+		return
+	}
+
+	fmt.Println("[✓] test OSS passed")
+
+	return
+}
 
 // Execute the main processing logic
 func Execute() {
@@ -63,6 +89,11 @@ func Execute() {
 	ctx, err := NewContext(conf)
 	if err != nil {
 		panic("init context error: " + err.Error())
+	}
+
+	err = Test(ctx)
+	if err != nil {
+		panic("context test error: " + err.Error())
 	}
 
 	// Synchronize composer.phar
