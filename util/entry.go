@@ -96,6 +96,12 @@ func Execute() {
 		panic("context test error: " + err.Error())
 	}
 
+	fmt.Println("test configurations successfully")
+
+	if _, ok := os.LookupEnv("JUST_TEST"); ok {
+		return
+	}
+
 	// Synchronize composer.phar
 	go ctx.SyncComposerPhar("ComposerPhar")
 
