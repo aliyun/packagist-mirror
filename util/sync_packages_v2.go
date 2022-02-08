@@ -34,7 +34,7 @@ func (ctx *Context) SyncPackagesV2(processName string) {
 
 		err = doAction(ctx, logger, action)
 		if err != nil {
-			logger.Error("unmarshal change action task failed. " + err.Error())
+			logger.Error(fmt.Sprintf("process package action(%s). ", jobJson) + err.Error())
 			continue
 		}
 	}
@@ -46,18 +46,16 @@ func doAction(ctx *Context, logger *MyLogger, action *ChangeAction) (err error) 
 	actionType := action.Type
 
 	if actionType == "update" {
-		err2 := updatePackageV2(ctx, logger, action)
-		err = fmt.Errorf("update package failed: " + err2.Error())
+		err = updatePackageV2(ctx, logger, action)
 		return
 	}
 
 	if actionType == "delete" {
-		err2 := deletePackageV2(ctx, logger, action)
-		err = fmt.Errorf("update package failed: " + err2.Error())
+		err = deletePackageV2(ctx, logger, action)
 		return
 	}
 
-	logger.Error("unsupported action: " + actionType)
+	err = fmt.Errorf("unsupported action: %s", actionType)
 	return
 }
 

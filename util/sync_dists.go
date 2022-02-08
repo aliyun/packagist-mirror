@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -27,7 +28,7 @@ func (ctx *Context) SyncDists(processName string) {
 		logger.Info("upload dist for " + dist.Path)
 		err = uploadDist(ctx, logger, dist)
 		if err != nil {
-			logger.Error("sync dist failed. " + err.Error())
+			logger.Error(fmt.Sprintf("sync dist(%s) failed. ", jobJson) + err.Error())
 			continue
 		}
 	}
@@ -64,6 +65,11 @@ func uploadDist(ctx *Context, logger *MyLogger, job *Dist) (err error) {
 	path := job.Path
 	url := job.Url
 
+	if url == "" {
+		err = fmt.Errorf("url is invalid")
+		return
+	}
+
 	// Count
 	ctx.redis.SAdd(getTodayKey(distSet), path).Result()
 	ctx.redis.ExpireAt(getTodayKey(distSet), getTomorrow())
@@ -75,7 +81,6 @@ func uploadDist(ctx *Context, logger *MyLogger, job *Dist) (err error) {
 	}
 
 	if isExist {
-		// makeSucceed(distSet, path)
 		return
 	}
 

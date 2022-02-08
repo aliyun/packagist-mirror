@@ -11,6 +11,12 @@ type Github struct {
 	userAgent string
 }
 
+const Github404 = GithubError("github: 404")
+
+type GithubError string
+
+func (e GithubError) Error() string { return string(e) }
+
 func NewGithub(token, userAgent string) (github *Github) {
 	return &Github{
 		token:     token,
@@ -65,6 +71,15 @@ func (github *Github) GetDist(url string) (resp *http.Response, err error) {
 	// Send req using http Client
 	client := &http.Client{}
 	resp, err = client.Do(req)
+
+	if err != nil {
+		return
+	}
+
+	if resp.StatusCode == 404 {
+		err = Github404
+		return
+	}
 
 	if resp.StatusCode != 200 {
 		err = fmt.Errorf("request github dist(%s) failed with code %d", url, resp.StatusCode)

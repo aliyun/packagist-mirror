@@ -69,7 +69,6 @@ func syncProvider(ctx *Context, logger *MyLogger, task *Task) (err error) {
 		return
 	}
 
-	// Json decode
 	providersRoot, err := NewProvidersFromJSONString(string(content))
 	if err != nil {
 		return
@@ -77,28 +76,32 @@ func syncProvider(ctx *Context, logger *MyLogger, task *Task) (err error) {
 
 	for packageName, hashers := range providersRoot.Providers {
 		sha256 := hashers.SHA256
-		exists, err2 := ctx.redis.HExists(packageV1Set, packageName).Result()
-		if err2 != nil {
-			return
-		}
-
-		if exists {
-			value, err2 := ctx.redis.HGet(packageV1Set, packageName).Result()
-			if err2 != nil {
-				return
-			}
-
-			if sha256 == value {
-				continue
-			}
-
+		value, err2 := ctx.redis.HGet(packageV1Set, packageName).Result()
+		if err2 == redis.Nil {
 			logger.Info(fmt.Sprintf("dispatch package(%s) to %s", packageName, packageP1Queue))
 			task := NewTask(packageName, "p/"+packageName+"$"+sha256+".json", sha256)
 			jsonP1, _ := json.Marshal(task)
 			ctx.redis.SAdd(packageP1Queue, string(jsonP1)).Result()
 			ctx.redis.SAdd(getTodayKey(packageV1Set), packageName)
 			ctx.redis.ExpireAt(getTodayKey(packageV1Set), getTomorrow())
+			continue
 		}
+
+		if err2 != nil {
+			err = fmt.Errorf("check exists failed" + err2.Error())
+			return
+		}
+
+		if sha256 != value {
+			logger.Info(fmt.Sprintf("dispatch package(%s) to %s", packageName, packageP1Queue))
+			task := NewTask(packageName, "p/"+packageName+"$"+sha256+".json", sha256)
+			jsonP1, _ := json.Marshal(task)
+			ctx.redis.SAdd(packageP1Queue, string(jsonP1)).Result()
+			ctx.redis.SAdd(getTodayKey(packageV1Set), packageName)
+			ctx.redis.ExpireAt(getTodayKey(packageV1Set), getTomorrow())
+			continue
+		}
+
 	}
 
 	ctx.cdn.WarmUp(task.Path)

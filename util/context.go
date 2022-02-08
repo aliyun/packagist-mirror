@@ -25,7 +25,7 @@ func NewContext(conf *Config) (ctx *Context, err error) {
 		return
 	}
 
-	redisClient = redis.NewClient(&redis.Options{
+	redisClient := redis.NewClient(&redis.Options{
 		Addr:     conf.RedisAddr,
 		Password: conf.RedisPassword,
 		DB:       conf.RedisDB,
@@ -34,7 +34,7 @@ func NewContext(conf *Config) (ctx *Context, err error) {
 	ctx = &Context{
 		ossBucket: bucketClient,
 		redis:     redisClient,
-		packagist: NewPackagist(conf.RepoUrl, conf.ApiUrl),
+		packagist: NewPackagist(conf.RepoUrl, conf.ApiUrl, conf.UserAgent),
 		cdn:       NewCDN(conf.BuildCache == "true", conf.MirrorUrl),
 		github:    NewGithub(conf.GithubToken, conf.UserAgent),
 		mirror:    NewMirror(conf.ProviderUrl, conf.DistUrl, conf.ApiIterationInterval),

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/go-redis/redis"
 )
 
 type Stable struct {
@@ -48,22 +49,15 @@ func syncComposerPhar(ctx *Context, logger *MyLogger) (err error) {
 
 	stable := versions["stable"][0]
 
-	exists, err := ctx.redis.Exists(localStableComposerVersion).Result()
-	if err != nil {
+	localStableVersion, err := ctx.redis.Get(localStableComposerVersion).Result()
+	if err != nil && err != redis.Nil {
+		err = fmt.Errorf("call redis failed: " + err.Error())
 		return
 	}
 
-	if exists > 0 {
-		localStableVersion, err2 := ctx.redis.Get(localStableComposerVersion).Result()
-		if err2 != nil {
-			err = fmt.Errorf("get local stable composer version: " + err2.Error())
-			return
-		}
-
-		if localStableVersion == stable.Version {
-			logger.Info("The remote version is equals with local version, no need to anything")
-			return
-		}
+	if localStableVersion == stable.Version {
+		logger.Info("The remote version is equals with local version, no need to anything")
+		return
 	}
 
 	// about 2.4MB

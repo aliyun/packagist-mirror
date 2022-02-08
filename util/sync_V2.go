@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/go-redis/redis"
 )
 
 func (ctx *Context) SyncV2(processName string) {
@@ -22,20 +24,14 @@ func (ctx *Context) SyncV2(processName string) {
 }
 
 func syncV2(ctx *Context, logger *MyLogger) (err error) {
-	var lastTimestamp string
 
-	exist, err := ctx.redis.Exists(v2LastUpdateTimeKey).Result()
-	if err != nil {
+	lastTimestamp, err := ctx.redis.Get(v2LastUpdateTimeKey).Result()
+	if err != nil && err != redis.Nil {
+		err = fmt.Errorf("get last timestamp failed" + err.Error())
 		return
 	}
 
-	if exist > 0 {
-		lastTimestamp, err = ctx.redis.Get(v2LastUpdateTimeKey).Result()
-		if err != nil {
-			err = fmt.Errorf("get last timestamp failed" + err.Error())
-			return
-		}
-	} else {
+	if lastTimestamp == "" {
 		lastTimestamp, err = ctx.packagist.GetInitTimestamp()
 		if err != nil {
 			return
@@ -62,7 +58,13 @@ func syncV2(ctx *Context, logger *MyLogger) (err error) {
 	for _, item := range changes.Actions {
 		packageName := item.Package
 		updateTime := strconv.FormatInt(int64(item.Time), 10)
+
 		storedUpdateTime, err2 := ctx.redis.HGet(packageV2Set, packageName).Result()
+		if err2 == redis.Nil {
+			ctx.redis.SAdd(packageV2Queue, item.ToJSONString()).Result()
+			continue
+		}
+
 		if err2 != nil {
 			err = fmt.Errorf("get time failed: " + err2.Error())
 			return

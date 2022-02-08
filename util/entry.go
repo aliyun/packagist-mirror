@@ -25,6 +25,7 @@ const (
 	packageV2Queue = "queue:packagesV2"
 
 	lastUpdateTimeKey          = "key:last-update"
+	packagistLastModifiedKey   = "key:packagist-last-modified"
 	localStableComposerVersion = "key:local-stable-composer-version"
 	v2LastUpdateTimeKey        = "key:v2-lastTimestamp"
 	packagesJsonKey            = "key:packages.json"
