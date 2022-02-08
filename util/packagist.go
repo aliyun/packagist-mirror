@@ -2,20 +2,23 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 )
 
 type Packagist struct {
-	repoUrl string
-	apiUrl  string
+	repoUrl   string
+	apiUrl    string
+	userAgent string
 }
 
-func NewPackagist(repoUrl string, apiUrl string) (packagist *Packagist) {
+func NewPackagist(repoUrl string, apiUrl string, userAgent string) (packagist *Packagist) {
 	return &Packagist{
-		repoUrl: repoUrl,
-		apiUrl:  apiUrl,
+		repoUrl:   repoUrl,
+		apiUrl:    apiUrl,
+		userAgent: userAgent,
 	}
 }
 
@@ -28,9 +31,29 @@ type Packages struct {
 	ProviderIncludes map[string]Hashes `json:"provider-includes"`
 }
 
-func (packagist *Packagist) GetPackagesJSON() (content []byte, err error) {
+func (packagist *Packagist) GetPackagesJSON() (body []byte, lastModified string, err error) {
 	url := packagist.repoUrl + "packages.json"
-	content, err = GetBody(url)
+	client := http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return
+	}
+
+	req.Header.Add("User-Agent", packagist.userAgent)
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		err = fmt.Errorf("Get %s failed with code %d", url, resp.StatusCode)
+		return
+	}
+
+	lastModified = resp.Header["Last-Modified"][0]
+	body, err = ioutil.ReadAll(resp.Body)
 	return
 }
 
@@ -60,7 +83,7 @@ func (packagist *Packagist) GetInitTimestamp() (timestamp string, err error) {
 		return
 	}
 
-	// req.Header.Add("User-Agent", config.UserAgent)
+	req.Header.Add("User-Agent", packagist.userAgent)
 	resp, err := client.Do(req)
 	if err != nil {
 		return

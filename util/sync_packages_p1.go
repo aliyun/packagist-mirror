@@ -27,7 +27,7 @@ type PackageDist struct {
 }
 
 type Response struct {
-	Packages map[string]map[string]Package
+	Packages map[string]map[string]Package `json:"packages"`
 }
 
 func (ctx *Context) SyncPackagesV1(processName string) {
@@ -35,7 +35,7 @@ func (ctx *Context) SyncPackagesV1(processName string) {
 	for {
 		jobJson, err := ctx.redis.SPop(packageP1Queue).Result()
 		if err == redis.Nil {
-			// logger.Info("get no task from " + packageP1Queue + ", sleep 1 second")
+			logger.Info("get no task from " + packageP1Queue + ", sleep 1 second")
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -54,7 +54,7 @@ func (ctx *Context) SyncPackagesV1(processName string) {
 
 		err = syncPackage(ctx, logger, task)
 		if err != nil {
-			logger.Error("sync package failed. " + err.Error())
+			logger.Error(fmt.Sprintf("sync package failed(%s). ", jobJson) + err.Error())
 			continue
 		}
 	}

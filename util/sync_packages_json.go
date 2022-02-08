@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/go-redis/redis"
 )
 
 func (ctx *Context) SyncPackagesJsonFile(processName string) {
@@ -20,7 +21,7 @@ func (ctx *Context) SyncPackagesJsonFile(processName string) {
 			return
 		}
 		// Each cycle requires a time slot
-		time.Sleep(1 * time.Second)
+		time.Sleep(60 * time.Second)
 	}
 
 }
@@ -35,32 +36,30 @@ func getPackages(content []byte) (packages *Packages, err error) {
 func syncPackagesJsonFile(ctx *Context, logger *MyLogger) (err error) {
 	// Get root file from packagist repo
 	logger.Info("get packages.json now")
-	packagistContent, err := ctx.packagist.GetPackagesJSON()
+	packagistContent, packagistLastModified, err := ctx.packagist.GetPackagesJSON()
 	logger.Info("get packages.json done")
 	if err != nil {
 		err = fmt.Errorf("get packages.json failed: " + err.Error())
 		return
 	}
 
-	sum := getSha256Sum(packagistContent)
-
-	exists, err := ctx.redis.Exists(packagesJsonKey).Result()
+	err = ctx.redis.Set(packagistLastModifiedKey, packagistLastModified, 0).Err()
 	if err != nil {
 		return
 	}
 
-	if exists > 0 {
-		localPackagesJsonSum, err2 := ctx.redis.Get(packagesJsonKey).Result()
-		if err != nil {
-			err = fmt.Errorf("get local packages.json sum failed: " + err2.Error())
-			return
-		}
+	sum := getSha256Sum(packagistContent)
 
-		if localPackagesJsonSum == sum {
-			// packages.json is not changed
-			logger.Info("packages.json is not changed")
-			return
-		}
+	localPackagesJsonSum, err2 := ctx.redis.Get(packagesJsonKey).Result()
+	if err != nil && err != redis.Nil {
+		err = fmt.Errorf("get local packages.json sum failed: " + err2.Error())
+		return
+	}
+
+	if localPackagesJsonSum == sum {
+		// packages.json is not changed
+		logger.Info("packages.json is not changed")
+		return
 	}
 
 	// JSON Decode
@@ -75,30 +74,31 @@ func syncPackagesJsonFile(ctx *Context, logger *MyLogger) (err error) {
 		providerHash := hashValue.SHA256
 		providerPath := strings.Replace(provider, "%hash%", providerHash, -1)
 
-		exists, err2 := ctx.redis.HExists(providerSet, provider).Result()
+		value, err2 := ctx.redis.HGet(providerSet, provider).Result()
+		if err2 == redis.Nil {
+			logger.Info("dispatch providers: " + provider)
+			task := NewTask(provider, providerPath, providerHash)
+			jsonP2, _ := json.Marshal(task)
+			ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
+			ctx.redis.SAdd(getTodayKey(providerSet), providerHash).Result()
+			ctx.redis.ExpireAt(getTodayKey(providerSet), getTomorrow()).Result()
+			continue
+		}
+
 		if err2 != nil {
 			err = fmt.Errorf("get provider set with key(%s) failed: "+err2.Error(), provider)
 			return
 		}
 
-		if exists {
-			value, err2 := ctx.redis.HGet(providerSet, provider).Result()
-			if err2 != nil {
-				err = fmt.Errorf("get provider set with key(%s) failed: "+err2.Error(), provider)
-				return
-			}
-
-			if value == providerHash {
-				continue
-			}
+		if value != providerHash {
+			logger.Info("dispatch providers: " + provider)
+			task := NewTask(provider, providerPath, providerHash)
+			jsonP2, _ := json.Marshal(task)
+			ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
+			ctx.redis.SAdd(getTodayKey(providerSet), providerHash).Result()
+			ctx.redis.ExpireAt(getTodayKey(providerSet), getTomorrow()).Result()
+			continue
 		}
-
-		logger.Info("dispatch providers: " + provider)
-		task := NewTask(provider, providerPath, providerHash)
-		jsonP2, _ := json.Marshal(task)
-		ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
-		ctx.redis.SAdd(getTodayKey(providerSet), providerHash).Result()
-		ctx.redis.ExpireAt(getTodayKey(providerSet), getTomorrow()).Result()
 	}
 
 	for {

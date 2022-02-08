@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/go-redis/redis"
 )
 
 func (ctx *Context) SyncStatus(processName string) {
@@ -22,13 +23,24 @@ func (ctx *Context) SyncStatus(processName string) {
 		// If this variable is equal to an empty string
 		// it may be that the other coroutine has not yet obtained
 		// proceeds to the next loop
-		if packagistLastModified == "" {
+		packagistLastModified, err := ctx.redis.Get(packagistLastModifiedKey).Result()
+		if err == redis.Nil {
+			continue
+		}
+
+		if err != nil {
+			logger.Error(err.Error())
 			continue
 		}
 
 		// Format: 2006-01-02 15:04:05
 		aliDateTime, err := ctx.redis.Get(lastUpdateTimeKey).Result()
+		if err == redis.Nil {
+			continue
+		}
+
 		if err != nil {
+			logger.Error(err.Error())
 			continue
 		}
 
