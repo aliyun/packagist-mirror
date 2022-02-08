@@ -3,18 +3,16 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"log"
-	"os"
 	"strconv"
 	"time"
 )
 
 func (ctx *Context) SyncV2(processName string) {
-	var logger = log.New(os.Stderr, processName, log.LUTC)
+	var logger = NewLogger(processName)
 	for {
-		err := syncV2(ctx)
+		err := syncV2(ctx, logger)
 		if err != nil {
-			logger.Println("sync v2 failed: " + err.Error())
+			logger.Error("sync v2 failed: " + err.Error())
 			continue
 		}
 
@@ -23,23 +21,30 @@ func (ctx *Context) SyncV2(processName string) {
 	}
 }
 
-func syncV2(ctx *Context) (err error) {
-	lastTimestamp, err := ctx.redis.Get("lastTimestamp").Result()
+func syncV2(ctx *Context, logger *MyLogger) (err error) {
+	var lastTimestamp string
+
+	exist, err := ctx.redis.Exists(v2LastUpdateTimeKey).Result()
 	if err != nil {
-		err = fmt.Errorf("get last timestamp failed" + err.Error())
 		return
 	}
 
-	if lastTimestamp == "" {
+	if exist > 0 {
+		lastTimestamp, err = ctx.redis.Get(v2LastUpdateTimeKey).Result()
+		if err != nil {
+			err = fmt.Errorf("get last timestamp failed" + err.Error())
+			return
+		}
+	} else {
 		lastTimestamp, err = ctx.packagist.GetInitTimestamp()
 		if err != nil {
 			return
 		}
 
-		syncAll(ctx)
-
-		err = ctx.redis.Set("lastTimestamp", lastTimestamp, 0).Err()
-		return
+		err = syncAll(ctx, logger)
+		if err != nil {
+			return
+		}
 	}
 
 	changes, err := ctx.packagist.GetMetadataChanges(lastTimestamp)
@@ -65,16 +70,14 @@ func syncV2(ctx *Context) (err error) {
 
 		if storedUpdateTime != updateTime {
 			ctx.redis.SAdd(packageV2Queue, item.ToJSONString()).Result()
-		} else {
-			fmt.Println("File is up to date:", packageName, updateTime)
 		}
 	}
 
-	err = ctx.redis.Set("lastTimestamp", timestampAPI, 0).Err()
+	err = ctx.redis.Set(v2LastUpdateTimeKey, timestampAPI, 0).Err()
 	return
 }
 
-func syncAll(ctx *Context) (err error) {
+func syncAll(ctx *Context, logger *MyLogger) (err error) {
 	// Get root file from repo
 	content, err := ctx.packagist.GetAllPackages()
 	if err != nil {
