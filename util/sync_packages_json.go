@@ -4,24 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
 
-var packagistLastModified = ""
-var syncHasError = false
-
 func (ctx *Context) SyncPackagesJsonFile(processName string) {
-	logger := log.New(os.Stderr, processName, log.LUTC)
+	logger := NewLogger(processName)
 
 	for {
 		err := syncPackagesJsonFile(ctx, logger)
 		if err != nil {
-			logger.Println("sync packages.json failed: " + err.Error())
+			logger.Error("sync packages.json failed: " + err.Error())
 			return
 		}
 		// Each cycle requires a time slot
@@ -37,25 +32,35 @@ func getPackages(content []byte) (packages *Packages, err error) {
 	return
 }
 
-func syncPackagesJsonFile(ctx *Context, logger *log.Logger) (err error) {
+func syncPackagesJsonFile(ctx *Context, logger *MyLogger) (err error) {
 	// Get root file from packagist repo
+	logger.Info("get packages.json now")
 	packagistContent, err := ctx.packagist.GetPackagesJSON()
-
+	logger.Info("get packages.json done")
 	if err != nil {
 		err = fmt.Errorf("get packages.json failed: " + err.Error())
 		return
 	}
 
-	localPackagesJsonSum, err := ctx.redis.Get(packagesJsonKey).Result()
+	sum := getSha256Sum(packagistContent)
+
+	exists, err := ctx.redis.Exists(packagesJsonKey).Result()
 	if err != nil {
-		err = fmt.Errorf("get local packages.json sum failed: " + err.Error())
 		return
 	}
 
-	sum := getSha256Sum(packagistContent)
-	if localPackagesJsonSum == sum {
-		// packages.json is not changed
-		return
+	if exists > 0 {
+		localPackagesJsonSum, err2 := ctx.redis.Get(packagesJsonKey).Result()
+		if err != nil {
+			err = fmt.Errorf("get local packages.json sum failed: " + err2.Error())
+			return
+		}
+
+		if localPackagesJsonSum == sum {
+			// packages.json is not changed
+			logger.Info("packages.json is not changed")
+			return
+		}
 	}
 
 	// JSON Decode
@@ -70,22 +75,30 @@ func syncPackagesJsonFile(ctx *Context, logger *log.Logger) (err error) {
 		providerHash := hashValue.SHA256
 		providerPath := strings.Replace(provider, "%hash%", providerHash, -1)
 
-		value, err2 := ctx.redis.HGet(providerSet, provider).Result()
+		exists, err2 := ctx.redis.HExists(providerSet, provider).Result()
 		if err2 != nil {
 			err = fmt.Errorf("get provider set with key(%s) failed: "+err2.Error(), provider)
 			return
 		}
 
-		if value != providerHash {
-			p := make(map[string]interface{})
-			p["key"] = provider
-			p["path"] = providerPath
-			p["hash"] = providerHash
-			jsonP2, _ := json.Marshal(p)
-			ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
-			ctx.redis.SAdd(getTodayKey(providerSet), providerHash).Result()
-			ctx.redis.ExpireAt(getTodayKey(providerSet), getTomorrow()).Result()
+		if exists {
+			value, err2 := ctx.redis.HGet(providerSet, provider).Result()
+			if err2 != nil {
+				err = fmt.Errorf("get provider set with key(%s) failed: "+err2.Error(), provider)
+				return
+			}
+
+			if value == providerHash {
+				continue
+			}
 		}
+
+		logger.Info("dispatch providers: " + provider)
+		task := NewTask(provider, providerPath, providerHash)
+		jsonP2, _ := json.Marshal(task)
+		ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
+		ctx.redis.SAdd(getTodayKey(providerSet), providerHash).Result()
+		ctx.redis.ExpireAt(getTodayKey(providerSet), getTomorrow()).Result()
 	}
 
 	for {
@@ -118,7 +131,7 @@ func syncPackagesJsonFile(ctx *Context, logger *log.Logger) (err error) {
 		if left == 0 {
 			break
 		}
-		fmt.Println("Processing:", left, ", Check again in 1 second. ")
+		logger.Info(fmt.Sprintf("Processing: %d, Check again in 1 second.", left))
 		time.Sleep(1 * time.Second)
 	}
 

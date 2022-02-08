@@ -7,123 +7,100 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/go-redis/redis"
 )
 
-func (ctx *Context) SyncProviders(processName string) {
-
+func (ctx *Context) SyncProvider(processName string) {
+	var logger = NewLogger(processName)
 	for {
-
-		jobJson := sPop(providerQueue)
-		if jobJson == "" {
+		jobJson, err := ctx.redis.SPop(providerQueue).Result()
+		if err == redis.Nil {
+			// logger.Info("get no task from " + providerQueue + ", sleep 1 second")
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		jobMap := make(map[string]string)
-		err := json.Unmarshal([]byte(jobJson), &jobMap)
 		if err != nil {
-			sAdd(providerSet+"-json_decode_error", jobJson)
+			logger.Error("get task from " + providerQueue + " failed. " + err.Error())
 			continue
 		}
 
-		path, ok := jobMap["path"]
-		if !ok {
-			fmt.Println(processName, "provider field not found: path")
-			continue
-		}
-
-		hash, ok := jobMap["hash"]
-		if !ok {
-			fmt.Println(processName, "provider field not found: hash")
-			continue
-		}
-
-		key, ok := jobMap["key"]
-		if !ok {
-			fmt.Println(processName, "provider field not found: key")
-			continue
-		}
-
-		content, err := ctx.packagist.GetAllPackages()
+		providerTask, err := NewTaskFromJSONString(jobJson)
 		if err != nil {
-			syncHasError = true
-			fmt.Println(processName, path, err.Error())
-			makeFailed(providerSet, path, err)
+			logger.Error("unmarshal provider task failed. " + err.Error())
 			continue
 		}
 
-		// if resp.StatusCode != 200 {
-		// 	syncHasError = true
-		// 	// Make failed count
-		// 	makeStatusCodeFailed(providerSet, resp.StatusCode, path)
-
-		// 	// Push into failed queue to retry
-		// 	if resp.StatusCode != 404 && resp.StatusCode != 410 {
-		// 		pushProvider(key, path, hash, processName)
-		// 	}
-
-		// 	continue
-		// }
-
-		// content, err := ioutil.ReadAll(resp.Body)
-		// _ = resp.Body.Close()
+		logger.Info(fmt.Sprintf("dispatch provider: %s", providerTask.Key))
+		err = syncProvider(ctx, logger, providerTask)
 		if err != nil {
-			syncHasError = true
-			fmt.Println(processName, path, err.Error())
+			logger.Error("sync provider failed. " + err.Error())
 			continue
 		}
-
-		if sum := getSha256Sum(content); sum != hash {
-			fmt.Println(processName, "Wrong Hash", "Original:", hash, "Current:", sum)
-			p := make(map[string]interface{})
-			p["key"] = key
-			p["path"] = path
-			p["hash"] = hash
-			jsonP2, _ := json.Marshal(p)
-			ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
-			continue
-		}
-
-		// Put to OSS
-		options := []oss.Option{
-			oss.ContentType("application/json"),
-		}
-		err = ctx.ossBucket.PutObject(path, bytes.NewReader(content), options...)
-		if err != nil {
-			syncHasError = true
-			fmt.Println("putObject Error", err.Error())
-			continue
-		}
-
-		// Json decode
-		distMap := make(map[string]interface{})
-		err = json.Unmarshal(content, &distMap)
-		if err != nil {
-			syncHasError = true
-			fmt.Println(processName, path, err.Error())
-			continue
-		}
-
-		ctx.redis.HSet(providerSet, key, hash).Err()
-		dispatchPackages(distMap["providers"])
-		ctx.cdn.WarmUp(path)
 	}
 
 }
 
-func dispatchPackages(distMap interface{}) {
-	for packageName, value := range distMap.(map[string]interface{}) {
-		for _, hash := range value.(map[string]interface{}) {
-			sha256 := hash.(string)
-			if !hGetValue(packageV1Set, packageName, sha256) {
-				p1 := make(map[string]interface{})
-				p1["key"] = packageName
-				p1["path"] = "p/" + packageName + "$" + sha256 + ".json"
-				p1["hash"] = sha256
-				jsonP1, _ := json.Marshal(p1)
-				sAdd(packageP1Queue, string(jsonP1))
-				countToday(packageV1Set, packageName)
+func syncProvider(ctx *Context, logger *MyLogger, task *Task) (err error) {
+	content, err := ctx.packagist.Get(task.Path)
+	if err != nil {
+		return
+	}
+
+	if sum := getSha256Sum(content); sum != task.Hash {
+		logger.Error("Wrong Hash, Original: " + task.Hash + " Current: " + sum)
+		logger.Error("re-add into provider queue")
+		jsonP2, _ := json.Marshal(task)
+		_, err = ctx.redis.SAdd(providerQueue, string(jsonP2)).Result()
+		return
+	}
+
+	// Put to OSS
+	options := []oss.Option{
+		oss.ContentType("application/json"),
+	}
+	err = ctx.ossBucket.PutObject(task.Path, bytes.NewReader(content), options...)
+	if err != nil {
+		return
+	}
+
+	err = ctx.redis.HSet(providerSet, task.Key, task.Hash).Err()
+	if err != nil {
+		return
+	}
+
+	// Json decode
+	providersRoot, err := NewProvidersFromJSONString(string(content))
+	if err != nil {
+		return
+	}
+
+	for packageName, hashers := range providersRoot.Providers {
+		sha256 := hashers.SHA256
+		exists, err2 := ctx.redis.HExists(packageV1Set, packageName).Result()
+		if err2 != nil {
+			return
+		}
+
+		if exists {
+			value, err2 := ctx.redis.HGet(packageV1Set, packageName).Result()
+			if err2 != nil {
+				return
 			}
+
+			if sha256 == value {
+				continue
+			}
+
+			logger.Info(fmt.Sprintf("dispatch package(%s) to %s", packageName, packageP1Queue))
+			task := NewTask(packageName, "p/"+packageName+"$"+sha256+".json", sha256)
+			jsonP1, _ := json.Marshal(task)
+			ctx.redis.SAdd(packageP1Queue, string(jsonP1)).Result()
+			ctx.redis.SAdd(getTodayKey(packageV1Set), packageName)
+			ctx.redis.ExpireAt(getTodayKey(packageV1Set), getTomorrow())
 		}
 	}
+
+	ctx.cdn.WarmUp(task.Path)
+	return
 }

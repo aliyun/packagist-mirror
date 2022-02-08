@@ -10,13 +10,14 @@ import (
 )
 
 func (ctx *Context) SyncStatus(processName string) {
-
+	var logger = NewLogger(processName)
+	logger.Info("start to sync status")
 	for {
 		time.Sleep(1 * time.Second)
 
 		// Initialize variables
 		status := make(map[string]interface{})
-		Content := make(map[string]interface{})
+		content := make(map[string]interface{})
 
 		// If this variable is equal to an empty string
 		// it may be that the other coroutine has not yet obtained
@@ -31,14 +32,14 @@ func (ctx *Context) SyncStatus(processName string) {
 			continue
 		}
 
-		Loc, _ := time.LoadLocation("Asia/Shanghai")
+		loc, _ := time.LoadLocation("Asia/Shanghai")
 		packagistLast, _ := time.Parse("Mon, 02 Jan 2006 15:04:05 GMT", packagistLastModified)
-		packagistDateTime := packagistLast.In(Loc).Format("2006-01-02 15:04:05")
+		packagistDateTime := packagistLast.In(loc).Format("2006-01-02 15:04:05")
 
 		aliComposerLast, _ := time.Parse("2006-01-02 15:04:05", aliDateTime)
 		packagistLast, _ = time.Parse("2006-01-02 15:04:05", packagistDateTime)
 
-		interval := int(aliComposerLast.In(Loc).Unix() - packagistLast.In(Loc).Unix())
+		interval := int(aliComposerLast.In(loc).Unix() - packagistLast.In(loc).Unix())
 		status["Delayed"] = 0
 		status["Interval"] = interval
 		if interval < 0 {
@@ -52,13 +53,13 @@ func (ctx *Context) SyncStatus(processName string) {
 			status["ShouldReportDelay"] = false
 		}
 
-		Content["Last_Update"] = map[string]interface{}{
+		content["Last_Update"] = map[string]interface{}{
 			"AliComposer": aliDateTime,
 			"Packagist":   packagistDateTime,
 		}
 
 		// Queue
-		Content["Queue"] = map[string]interface{}{
+		content["Queue"] = map[string]interface{}{
 			"Providers":  sCard(providerQueue),
 			"Packages":   sCard(packageP1Queue) + sCard(packageV2Queue),
 			"Dists":      sCard(distQueue),
@@ -66,7 +67,7 @@ func (ctx *Context) SyncStatus(processName string) {
 		}
 
 		// Statistics
-		Content["Statistics"] = map[string]interface{}{
+		content["Statistics"] = map[string]interface{}{
 			"Dists_Available":             sCard(distSet),
 			"Dists_Failed":                countFailed(distSet),
 			"Dists_Forbidden":             countStatusCodedFailed(distSet, 403),
@@ -82,7 +83,7 @@ func (ctx *Context) SyncStatus(processName string) {
 		}
 
 		// Today Updated
-		Content["Today_Updated"] = map[string]interface{}{
+		content["Today_Updated"] = map[string]interface{}{
 			"Dists":             sCard(getTodayKey(distSet)),
 			"Packages":          sCard(getTodayKey(packageV1Set)),
 			"PackagesHashFile":  sCard(getTodayKey(packageV1SetHash)),
@@ -90,7 +91,7 @@ func (ctx *Context) SyncStatus(processName string) {
 			"Versions":          sCard(getTodayKey(versionsSet)),
 		}
 
-		status["Content"] = Content
+		status["Content"] = content
 		status["CacheSeconds"] = 30
 
 		// Update status.json

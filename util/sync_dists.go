@@ -1,41 +1,41 @@
 package util
 
 import (
-	"fmt"
-	"log"
-	"os"
 	"time"
+
+	"github.com/go-redis/redis"
 )
 
 func (ctx *Context) SyncDists(processName string) {
-	var logger = log.New(os.Stderr, processName, log.LUTC)
+	var logger = NewLogger(processName)
 	for {
 		jobJson, err := ctx.redis.SPop(distQueue).Result()
-		if err != nil {
-			logger.Println("pop from queue(" + distQueue + ") failed")
-			time.Sleep(1 * time.Second)
-			continue
-		}
 
-		if jobJson == "" {
+		if err == redis.Nil {
+			// logger.Info("get no task from " + distQueue + ", sleep 1 second")
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
 		dist, err := NewDistFromJSONString(jobJson)
 		if err != nil {
-			logger.Println("Covert to Dist failed: " + jobJson)
+			logger.Error("Covert to Dist failed: " + jobJson)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		uploadDist(ctx, dist)
+		logger.Info("upload dist for " + dist.Path)
+		err = uploadDist(ctx, logger, dist)
+		if err != nil {
+			logger.Error("sync dist failed. " + err.Error())
+			continue
+		}
 	}
 
 }
 
 func (ctx *Context) SyncDistsRetry(processName string) {
-	var logger = log.New(os.Stderr, processName, log.LUTC)
+	var logger = NewLogger(processName)
 	for {
 		jobJson, err := ctx.redis.SPop(distQueueRetry).Result()
 		if jobJson == "" {
@@ -43,31 +43,39 @@ func (ctx *Context) SyncDistsRetry(processName string) {
 			continue
 		}
 
-		time.Sleep(2 * time.Second)
-
 		dist, err := NewDistFromJSONString(jobJson)
 		if err != nil {
-			logger.Println("Covert to Dist failed: " + jobJson)
+			logger.Error("Covert to Dist failed: " + jobJson)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		uploadDist(ctx, dist)
+		err = uploadDist(ctx, logger, dist)
+		if err != nil {
+			logger.Error("sync dist failed. " + err.Error())
+			continue
+		}
 	}
 
 }
 
-func uploadDist(ctx *Context, job *Dist) (err error) {
+func uploadDist(ctx *Context, logger *MyLogger, job *Dist) (err error) {
 	// Get information
 	path := job.Path
 	url := job.Url
 
 	// Count
-	countToday(distSet, path)
+	ctx.redis.SAdd(getTodayKey(distSet), path).Result()
+	ctx.redis.ExpireAt(getTodayKey(distSet), getTomorrow())
 
 	// OSS IsObjectExist
-	if isExist, _ := ctx.ossBucket.IsObjectExist(path); isExist {
-		makeSucceed(distSet, path)
+	isExist, err := ctx.ossBucket.IsObjectExist(path)
+	if err != nil {
+		return
+	}
+
+	if isExist {
+		// makeSucceed(distSet, path)
 		return
 	}
 
@@ -75,33 +83,30 @@ func uploadDist(ctx *Context, job *Dist) (err error) {
 	resp, err := ctx.github.GetDist(url)
 
 	if err != nil {
-		syncHasError = true
-		fmt.Println(path, err.Error())
-		makeFailed(distSet, path, err)
+		// makeFailed(distSet, path, err)
 		return
 	}
 
-	if resp.StatusCode != 200 {
-		syncHasError = true
-		// Make failed count
-		makeStatusCodeFailed(distSet, resp.StatusCode, url)
+	// if resp.StatusCode != 200 {
+	// 	syncHasError = true
+	// 	// Make failed count
+	// 	makeStatusCodeFailed(distSet, resp.StatusCode, url)
 
-		// Push into failed queue to retry
-		if resp.StatusCode != 404 && resp.StatusCode != 410 {
-			sAdd(distQueueRetry, job.ToJSONString())
-		}
+	// 	// Push into failed queue to retry
+	// 	if resp.StatusCode != 404 && resp.StatusCode != 410 {
+	// 		sAdd(distQueueRetry, job.ToJSONString())
+	// 	}
 
-		return
-	}
+	// 	return
+	// }
 
 	// Put into OSS
 	err = ctx.ossBucket.PutObject(path, resp.Body)
 	if err != nil {
-		syncHasError = true
 		return
 	}
 
-	makeSucceed(distSet, path)
+	// makeSucceed(distSet, path)
 	ctx.cdn.WarmUp(path)
 	return
 }

@@ -12,8 +12,8 @@ type MyLogger struct {
 
 func NewLogger(prefix string) (logger *MyLogger) {
 	return &MyLogger{
-		stdout: log.New(os.Stdout, prefix, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile),
-		stderr: log.New(os.Stderr, prefix, log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile),
+		stdout: log.New(os.Stdout, prefix+" ", log.Ldate|log.Ltime|log.Lmicroseconds),
+		stderr: log.New(os.Stderr, prefix+" ", log.Ldate|log.Ltime|log.Lmicroseconds),
 	}
 }
 

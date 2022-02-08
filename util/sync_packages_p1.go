@@ -7,187 +7,113 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/go-redis/redis"
 )
 
+type Package struct {
+	Name string      `json:"name"`
+	Dist PackageDist `json:"dist"`
+}
+
+type PackageDist struct {
+	Type      string `json:"type"`
+	Url       string `json:"url"`
+	Reference string `json:"reference"`
+	Shasum    string `json:"shasum"`
+	// "type": "zip",
+	// "url": "https://gitlab.com/api/v4/projects/ACP3%2Fcms/repository/archive.zip?sha=78b68105237832ec6684299f17857c58fa895a46",
+	// "reference": "78b68105237832ec6684299f17857c58fa895a46",
+	// "shasum": ""
+}
+
+type Response struct {
+	Packages map[string]map[string]Package
+}
+
 func (ctx *Context) SyncPackagesV1(processName string) {
+	var logger = NewLogger(processName)
 	for {
-		jobJson := sPop(packageP1Queue)
-		if jobJson == "" {
+		jobJson, err := ctx.redis.SPop(packageP1Queue).Result()
+		if err == redis.Nil {
+			// logger.Info("get no task from " + packageP1Queue + ", sleep 1 second")
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		// Json decode
-		jobMap := make(map[string]string)
-		err := json.Unmarshal([]byte(jobJson), &jobMap)
 		if err != nil {
-			fmt.Println(processName, "JSON Decode Error:", jobJson)
-			sAdd(packageV1Set+"-json_decode_error", jobJson)
-			continue
-		}
-
-		path, ok := jobMap["path"]
-		if !ok {
-			fmt.Println(processName, "package field not found: path")
-			continue
-		}
-
-		hash, ok := jobMap["hash"]
-		if !ok {
-			fmt.Println(processName, "package field not found: hash")
-			continue
-		}
-
-		key, ok := jobMap["key"]
-		if !ok {
-			fmt.Println(processName, "package field not found: key")
-			continue
-		}
-
-		content, err := ctx.packagist.GetPackage(path)
-		if err != nil {
-			syncHasError = true
-			fmt.Println(processName, path, err.Error())
-			makeFailed(packageV1Set, path, err)
-			continue
-		}
-
-		// if resp.StatusCode != 200 {
-		// 	syncHasError = true
-
-		// 	// Make failed count
-		// 	makeStatusCodeFailed(packageV1Set, resp.StatusCode, path)
-
-		// 	// Push into failed queue to retry
-		// 	if resp.StatusCode != 404 && resp.StatusCode != 410 {
-		// 		sAdd(packageP1Queue, jobJson)
-		// 	}
-
-		// 	continue
-		// }
-
-		// content, err := ioutil.ReadAll(resp.Body)
-		// _ = resp.Body.Close()
-		if err != nil {
-			syncHasError = true
-			fmt.Println(processName, path, err.Error())
-			continue
-		}
-
-		// content, err = decode(content)
-		// if err != nil {
-		// 	syncHasError = true
-		// 	fmt.Println("parseGzip Error", err.Error())
-		// 	continue
-		// }
-
-		if sum := getSha256Sum(content); sum != hash {
-			fmt.Println(processName, "Wrong Hash", "Original:", hash, "Current:", sum)
-			syncHasError = true
-			continue
-		}
-
-		// Put to OSS
-		options := []oss.Option{
-			oss.ContentType("application/json"),
-		}
-		err = ctx.ossBucket.PutObject(path, bytes.NewReader(content), options...)
-		if err != nil {
-			syncHasError = true
-			fmt.Println("putObject Error", err.Error())
+			logger.Error("get task from " + packageP1Queue + " failed. " + err.Error())
 			continue
 		}
 
 		// Json decode
-		distMap := make(map[string]interface{})
-		err = json.Unmarshal(content, &distMap)
+		task, err := NewTaskFromJSONString(jobJson)
 		if err != nil {
-			syncHasError = true
-			fmt.Println(processName, path, "Error parsing JSON", err.Error())
+			logger.Error("unmarshal package task failed. " + err.Error())
 			continue
 		}
 
-		ctx.redis.HSet(packageV1Set, key, hash).Err()
-		dispatchDists(ctx, distMap["packages"], processName, ctx.mirror.distUrl+path)
-		ctx.cdn.WarmUp(path)
-		countToday(packageV1SetHash, path)
+		err = syncPackage(ctx, logger, task)
+		if err != nil {
+			logger.Error("sync package failed. " + err.Error())
+			continue
+		}
 	}
 
 }
 
-func dispatchDists(ctx *Context, packages interface{}, processName string, path string) {
-
-	list, ok := packages.(map[string]interface{})
-	if !ok {
-		countAll(packagesNoData, path)
+func syncPackage(ctx *Context, logger *MyLogger, task *Task) (err error) {
+	content, err := ctx.packagist.Get(task.Path)
+	if err != nil {
 		return
 	}
 
-	for packageName, value := range list {
-		for version, versionContent := range value.(map[string]interface{}) {
-
-			distName := packageName + "/" + version
-
-			for diskKeyName, dist := range versionContent.(map[string]interface{}) {
-
-				if diskKeyName != "dist" {
-					continue
-				}
-
-				distContent, ok := dist.(map[string]interface{})
-				if !ok {
-					sAdd(distsNoMetaKey, path)
-					continue
-				}
-
-				if v, ok := distContent["type"]; !ok {
-					fmt.Println(processName, "type does not exist")
-					sAdd(distsNoMetaKey, path)
-
-					continue
-				} else if v == nil {
-					fmt.Println(processName, "type is empty")
-					sAdd(distsNoMetaKey, path)
-
-					continue
-				}
-
-				if v, ok := distContent["url"]; !ok {
-					fmt.Println(processName, "url does not exist")
-					sAdd(distsNoMetaKey, path)
-
-					continue
-				} else if v == nil {
-					fmt.Println(processName, "url is empty")
-					sAdd(distsNoMetaKey, path)
-
-					continue
-				}
-
-				if v, ok := distContent["reference"]; !ok {
-					fmt.Println(processName, "reference does not exist")
-					sAdd(distsNoMetaKey, path)
-
-					continue
-				} else if v == nil {
-					fmt.Println(processName, "reference is empty")
-					sAdd(distsNoMetaKey, path)
-
-					continue
-				}
-
-				path := "dists/" + packageName + "/" + distContent["reference"].(string) + "." + distContent["type"].(string)
-
-				if !sIsMember(distSet, path) {
-					dist := NewDist(path, distContent["url"].(string))
-					ctx.redis.SAdd(distQueue, dist.ToJSONString())
-					countAll(versionsSet, distName)
-					countToday(versionsSet, distName)
-				}
-			}
-
-		}
-
+	if sum := getSha256Sum(content); sum != task.Hash {
+		logger.Error(fmt.Sprintf("Wrong Hash, Original: %s, Current: %s", task.Hash, sum))
+		return
 	}
 
+	// Put to OSS
+	options := []oss.Option{
+		oss.ContentType("application/json"),
+	}
+	err = ctx.ossBucket.PutObject(task.Path, bytes.NewReader(content), options...)
+	if err != nil {
+		return
+	}
+
+	// Json decode
+	response := new(Response)
+	err = json.Unmarshal(content, &response)
+	if err != nil {
+		return
+	}
+
+	ctx.redis.HSet(packageV1Set, task.Key, task.Hash).Err()
+	for packageName, versions := range response.Packages {
+		for versionName, packageVersion := range versions {
+			distName := packageName + "/" + versionName
+
+			dist := packageVersion.Dist
+			path := "dists/" + packageName + "/" + dist.Reference + "." + dist.Type
+
+			exist, err2 := ctx.redis.SIsMember(distSet, path).Result()
+			if err2 != nil {
+				err = fmt.Errorf("check dists path failed: " + err2.Error())
+				return
+			}
+
+			if !exist {
+				dist := NewDist(path, dist.Url)
+				ctx.redis.SAdd(distQueue, dist.ToJSONString())
+				ctx.redis.SAdd(versionsSet, distName).Result()
+				ctx.redis.SAdd(getTodayKey(versionsSet), distName)
+				ctx.redis.ExpireAt(getTodayKey(versionsSet), getTomorrow())
+			}
+		}
+	}
+
+	ctx.cdn.WarmUp(task.Path)
+	ctx.redis.SAdd(getTodayKey(packageV1SetHash), task.Path)
+	ctx.redis.ExpireAt(getTodayKey(packageV1SetHash), getTomorrow())
+	return
 }

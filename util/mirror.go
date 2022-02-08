@@ -65,3 +65,33 @@ func (action *ChangeAction) ToJSONString() string {
 	jsonStr, _ := json.Marshal(action)
 	return string(jsonStr)
 }
+
+type Task struct {
+	Key  string `json:"key"`
+	Path string `json:"path"`
+	Hash string `json:"hash"`
+}
+
+func NewTask(key, path, hash string) *Task {
+	return &Task{
+		Key:  key,
+		Path: path,
+		Hash: hash,
+	}
+}
+
+func NewTaskFromJSONString(jsonString string) (task *Task, err error) {
+	task = new(Task)
+	err = json.Unmarshal([]byte(jsonString), task)
+	return
+}
+
+type Providers struct {
+	Providers map[string]Hashes `json:"providers"`
+}
+
+func NewProvidersFromJSONString(jsonString string) (providers *Providers, err error) {
+	providers = new(Providers)
+	err = json.Unmarshal([]byte(jsonString), providers)
+	return
+}

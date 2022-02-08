@@ -9,15 +9,6 @@ import (
 
 var redisClient *redis.Client
 
-func countAll(key, member string) {
-	sAdd(key, member)
-}
-
-func countToday(key, member string) {
-	sAdd(getTodayKey(key), member)
-	redisClient.ExpireAt(getTodayKey(key), getTomorrow())
-}
-
 func sAdd(key string, member string) {
 	redisClient.SAdd(key, member).Result()
 }

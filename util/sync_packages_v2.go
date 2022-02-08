@@ -7,50 +7,67 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/go-redis/redis"
 )
 
 func (ctx *Context) SyncPackagesV2(processName string) {
-
+	var logger = NewLogger(processName)
 	for {
 		jobJson, err := ctx.redis.SPop(packageV2Queue).Result()
-		if err != nil {
+		if err == redis.Nil {
+			logger.Info("get no task from " + providerQueue + ", sleep 1 second")
 			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		if err != nil {
+			logger.Error("get task from " + packageV2Queue + " failed. " + err.Error())
 			continue
 		}
 
 		// Json decode
 		action, err := NewChangeActionFromJSONString(jobJson)
 		if err != nil {
-			time.Sleep(1 * time.Second)
+			logger.Error("unmarshal change action task failed. " + err.Error())
 			continue
 		}
 
-		actionType := action.Type
-
-		if actionType == "update" {
-			updatePackageV2(ctx, action)
+		err = doAction(ctx, logger, action)
+		if err != nil {
+			logger.Error("unmarshal change action task failed. " + err.Error())
+			continue
 		}
-
-		if actionType == "delete" {
-			deletePackageV2(ctx, action)
-		}
-
 	}
 
 }
 
-func updatePackageV2(ctx *Context, action *ChangeAction) (err error) {
-	packageName := action.Package
-	content, err := ctx.packagist.GetPackage(packageName)
-	if err != nil {
-		makeFailed(packageV2Set, packageName, err)
+func doAction(ctx *Context, logger *MyLogger, action *ChangeAction) (err error) {
+
+	actionType := action.Type
+
+	if actionType == "update" {
+		err2 := updatePackageV2(ctx, logger, action)
+		err = fmt.Errorf("update package failed: " + err2.Error())
 		return
 	}
 
-	// if resp.StatusCode != 200 {
-	// 	makeStatusCodeFailed(packageV2Set, resp.StatusCode, path)
-	// 	return
-	// }
+	if actionType == "delete" {
+		err2 := deletePackageV2(ctx, logger, action)
+		err = fmt.Errorf("update package failed: " + err2.Error())
+		return
+	}
+
+	logger.Error("unsupported action: " + actionType)
+	return
+}
+
+func updatePackageV2(ctx *Context, logger *MyLogger, action *ChangeAction) (err error) {
+	packageName := action.Package
+	content, err := ctx.packagist.GetPackage(packageName)
+	if err != nil {
+		// makeFailed(packageV2Set, packageName, err)
+		return
+	}
 
 	// JSON Decode
 	packageJson := make(map[string]interface{})
@@ -73,8 +90,6 @@ func updatePackageV2(ctx *Context, action *ChangeAction) (err error) {
 	path := "p2/" + packageName + ".json"
 	err = ctx.ossBucket.PutObject(path, bytes.NewReader(content), options...)
 	if err != nil {
-		syncHasError = true
-		fmt.Println("putObject Error", err.Error())
 		return
 	}
 
@@ -87,7 +102,7 @@ func updatePackageV2(ctx *Context, action *ChangeAction) (err error) {
 	return
 }
 
-func deletePackageV2(ctx *Context, action *ChangeAction) (err error) {
+func deletePackageV2(ctx *Context, logger *MyLogger, action *ChangeAction) (err error) {
 	packageName := action.Package
 	path := "p2/" + packageName + ".json"
 	err = ctx.ossBucket.DeleteObject(path)
