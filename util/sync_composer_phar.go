@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -18,20 +16,20 @@ type Stable struct {
 }
 
 func (ctx *Context) SyncComposerPhar(processName string) {
-	var logger = log.New(os.Stderr, processName, log.LUTC)
+	var logger = NewLogger(processName)
 
-	fmt.Println("init sync composer.phar")
+	logger.Info("init sync composer.phar")
 	for {
-		err := syncComposerPhar(ctx)
+		err := syncComposerPhar(ctx, logger)
 		if err != nil {
-			logger.Println("Sync composer.phar failed: " + err.Error())
+			logger.Error("Sync composer.phar failed: " + err.Error())
 		}
 		// Each cycle requires a time slot
 		time.Sleep(6000 * time.Second)
 	}
 }
 
-func syncComposerPhar(ctx *Context) (err error) {
+func syncComposerPhar(ctx *Context, logger *MyLogger) (err error) {
 	// Get latest stable version
 	versionsContent, err := GetBody("https://getcomposer.org/versions")
 	if err != nil {
@@ -50,18 +48,26 @@ func syncComposerPhar(ctx *Context) (err error) {
 
 	stable := versions["stable"][0]
 
-	localStableVersion, err := ctx.redis.Get(localStableComposerVersion).Result()
+	exists, err := ctx.redis.Exists(localStableComposerVersion).Result()
 	if err != nil {
-		err = fmt.Errorf("get local stable composer version: " + err.Error())
 		return
 	}
 
-	if localStableVersion == stable.Version {
-		// no need to anything
-		return
+	if exists > 0 {
+		localStableVersion, err2 := ctx.redis.Get(localStableComposerVersion).Result()
+		if err2 != nil {
+			err = fmt.Errorf("get local stable composer version: " + err2.Error())
+			return
+		}
+
+		if localStableVersion == stable.Version {
+			logger.Info("The remote version is equals with local version, no need to anything")
+			return
+		}
 	}
 
 	// about 2.4MB
+	logger.Info("get composer.phar now")
 	// Like https://getcomposer.org/download/1.9.1/composer.phar
 	composerPhar, err := GetBody("https://getcomposer.org" + stable.Path)
 	if err != nil {
@@ -90,6 +96,7 @@ func syncComposerPhar(ctx *Context) (err error) {
 		return
 	}
 
+	logger.Info("put composer.phar on OSS")
 	err = ctx.ossBucket.PutObject("composer.phar", bytes.NewReader(composerPhar))
 	if err != nil {
 		// logger the error, but ignore it
@@ -120,6 +127,7 @@ func syncComposerPhar(ctx *Context) (err error) {
 	}
 
 	// The cache is updated only if the push is successful
+	logger.Info("save stable composer version into local store")
 	err = ctx.redis.Set(localStableComposerVersion, stable.Version, 0).Err()
 	if err != nil {
 		err = fmt.Errorf("save stable composer version failed: " + err.Error())
