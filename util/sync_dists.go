@@ -81,6 +81,7 @@ func uploadDist(ctx *Context, logger *MyLogger, job *Dist) (err error) {
 	}
 
 	if isExist {
+		logger.Info(fmt.Sprintf("object(%s) exists", path))
 		return
 	}
 

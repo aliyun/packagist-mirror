@@ -22,5 +22,8 @@ func (logger *MyLogger) Error(message string) {
 }
 
 func (logger *MyLogger) Info(message string) {
+	if _, ok := os.LookupEnv("IGNORE_STDOUT"); ok {
+		return
+	}
 	logger.stdout.Println(message)
 }
