@@ -145,6 +145,8 @@ func syncPackagesJsonFile(ctx *Context, logger *MyLogger) (err error) {
 		return
 	}
 
+	// ignore the upstream info
+	newPackagesJson["info"] = ""
 	newPackagesJson["last-update"] = lastUpdateTime
 	newPackagesJson["metadata-url"] = ctx.mirror.providerUrl + "p2/%package%.json"
 	newPackagesJson["providers-url"] = ctx.mirror.providerUrl + "p/%package%$%hash%.json"
@@ -166,6 +168,7 @@ func syncPackagesJsonFile(ctx *Context, logger *MyLogger) (err error) {
 	if err != nil {
 		return
 	}
+	logger.Info("save packages.json on OSS done")
 
 	// save local packages.json sum to redis
 	err = ctx.redis.Set(packagesJsonKey, sum, 0).Err()

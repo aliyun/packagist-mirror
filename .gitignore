@@ -16,3 +16,4 @@ packagist.yml
 Gopkg.lock
 coverage.txt
 coverage.html
+packagist-mirror
