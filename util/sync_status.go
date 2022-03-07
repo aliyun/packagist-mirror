@@ -72,35 +72,35 @@ func (ctx *Context) SyncStatus(processName string) {
 
 		// Queue
 		content["Queue"] = map[string]interface{}{
-			"Providers":  sCard(providerQueue),
-			"Packages":   sCard(packageP1Queue) + sCard(packageV2Queue),
-			"Dists":      sCard(distQueue),
-			"DistsRetry": sCard(distQueueRetry),
+			"Providers":  ctx.redisSCard(providerQueue),
+			"Packages":   ctx.redisSCard(packageP1Queue) + ctx.redisSCard(packageV2Queue),
+			"Dists":      ctx.redisSCard(distQueue),
+			"DistsRetry": ctx.redisSCard(distQueueRetry),
 		}
 
 		// Statistics
 		content["Statistics"] = map[string]interface{}{
-			"Dists_Available":             sCard(distSet),
-			"Dists_Failed":                countFailed(distSet),
-			"Dists_Forbidden":             countStatusCodedFailed(distSet, 403),
-			"Dists_Gone":                  countStatusCodedFailed(distSet, 410),
-			"Dists_Meta_Missing":          sCard(distsNoMetaKey),
-			"Dists_Not_Found":             countStatusCodedFailed(distSet, 404),
-			"Dists_Internal_Server_Error": countStatusCodedFailed(distSet, 500),
-			"Dists_Bad_Gateway":           countStatusCodedFailed(distSet, 502),
-			"Packages":                    hLen(packageV1Set),
-			"Packages_No_Data":            sCard(packagesNoData),
-			"Providers":                   hLen(providerSet),
-			"Versions":                    sCard(versionsSet),
+			"Dists_Available":             ctx.redisSCard(distSet),
+			"Dists_Failed":                ctx.countFailed(distSet),
+			"Dists_Forbidden":             ctx.countStatusCodedFailed(distSet, 403),
+			"Dists_Gone":                  ctx.countStatusCodedFailed(distSet, 410),
+			"Dists_Meta_Missing":          ctx.redisSCard(distsNoMetaKey),
+			"Dists_Not_Found":             ctx.countStatusCodedFailed(distSet, 404),
+			"Dists_Internal_Server_Error": ctx.countStatusCodedFailed(distSet, 500),
+			"Dists_Bad_Gateway":           ctx.countStatusCodedFailed(distSet, 502),
+			"Packages":                    ctx.redisHLen(packageV1Set),
+			"Packages_No_Data":            ctx.redisSCard(packagesNoData),
+			"Providers":                   ctx.redisHLen(providerSet),
+			"Versions":                    ctx.redisSCard(versionsSet),
 		}
 
 		// Today Updated
 		content["Today_Updated"] = map[string]interface{}{
-			"Dists":             sCard(getTodayKey(distSet)),
-			"Packages":          sCard(getTodayKey(packageV1Set)),
-			"PackagesHashFile":  sCard(getTodayKey(packageV1SetHash)),
-			"ProvidersHashFile": sCard(getTodayKey(providerSet)),
-			"Versions":          sCard(getTodayKey(versionsSet)),
+			"Dists":             ctx.redisSCard(getTodayKey(distSet)),
+			"Packages":          ctx.redisSCard(getTodayKey(packageV1Set)),
+			"PackagesHashFile":  ctx.redisSCard(getTodayKey(packageV1SetHash)),
+			"ProvidersHashFile": ctx.redisSCard(getTodayKey(providerSet)),
+			"Versions":          ctx.redisSCard(getTodayKey(versionsSet)),
 		}
 
 		status["Content"] = content
