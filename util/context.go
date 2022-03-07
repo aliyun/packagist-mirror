@@ -1,6 +1,8 @@
 package util
 
 import (
+	"strconv"
+
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/go-redis/redis"
 )
@@ -40,4 +42,38 @@ func NewContext(conf *Config) (ctx *Context, err error) {
 		mirror:    NewMirror(conf.ProviderUrl, conf.DistUrl, conf.ApiIterationInterval),
 	}
 	return
+}
+
+func (ctx *Context) redisHLen(key string) int64 {
+	num, err := ctx.redis.HLen(key).Result()
+	if err != nil {
+		num = 0
+	}
+	return num
+}
+
+func (ctx *Context) redisSAdd(key string, member string) {
+	ctx.redis.SAdd(key, member).Result()
+}
+
+func (ctx *Context) redisSRem(key string, member string) {
+	ctx.redis.SRem(key, member).Result()
+}
+
+func (ctx *Context) redisSCard(key string) int64 {
+	num, err := ctx.redis.SCard(key).Result()
+	if err != nil {
+		num = 0
+	}
+	return num
+}
+
+func (ctx *Context) countFailed(key string) int64 {
+	key += "-failed"
+	return ctx.redisHLen(key)
+}
+
+func (ctx *Context) countStatusCodedFailed(key string, statusCode int) int64 {
+	key += "-" + strconv.Itoa(statusCode)
+	return ctx.redisSCard(key)
 }
