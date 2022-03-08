@@ -18,7 +18,7 @@ func NewCDN(buildCache bool, mirrorURL string) (cdn *CDN) {
 }
 
 func (cdn *CDN) WarmUp(path string) (err error) {
-	if cdn.buildCache == false {
+	if !cdn.buildCache {
 		return
 	}
 

@@ -52,14 +52,6 @@ func (ctx *Context) redisHLen(key string) int64 {
 	return num
 }
 
-func (ctx *Context) redisSAdd(key string, member string) {
-	ctx.redis.SAdd(key, member).Result()
-}
-
-func (ctx *Context) redisSRem(key string, member string) {
-	ctx.redis.SRem(key, member).Result()
-}
-
 func (ctx *Context) redisSCard(key string) int64 {
 	num, err := ctx.redis.SCard(key).Result()
 	if err != nil {

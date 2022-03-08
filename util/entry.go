@@ -70,7 +70,7 @@ func Execute() {
 
 	configPath := os.Args[1]
 
-	if path.IsAbs(configPath) != true {
+	if !path.IsAbs(configPath) {
 		wd, err := os.Getwd()
 		if err != nil {
 			panic("working directory is not existing")

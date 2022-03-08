@@ -58,4 +58,5 @@ func TestGet(t *testing.T) {
 	response := new(Response)
 	fmt.Println(string(content))
 	err = json.Unmarshal(content, &response)
+	assert.Nil(t, err)
 }

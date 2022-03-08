@@ -39,7 +39,8 @@ func (ctx *Context) SyncDistsRetry(processName string) {
 	var logger = NewLogger(processName)
 	for {
 		jobJson, err := ctx.redis.SPop(distQueueRetry).Result()
-		if jobJson == "" {
+		if err == redis.Nil {
+			// logger.Info("get no task from " + distQueue + ", sleep 1 second")
 			time.Sleep(1 * time.Second)
 			continue
 		}
