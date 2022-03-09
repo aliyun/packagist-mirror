@@ -145,7 +145,7 @@ func syncPackagesJsonFile(ctx *Context, logger *MyLogger) (err error) {
 		return
 	}
 
-	// ignore the upstream info
+	// ignore the upstream info, NEVER TRUST THE UPSTREAM
 	newPackagesJson["info"] = ""
 	newPackagesJson["last-update"] = lastUpdateTime
 	newPackagesJson["metadata-url"] = ctx.mirror.providerUrl + "p2/%package%.json"
