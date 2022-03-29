@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 type Github struct {
@@ -64,7 +65,7 @@ func (github *Github) GetDist(url string) (resp *http.Response, err error) {
 	}
 
 	// add authorization header to the req
-	if github.token != "" {
+	if github.token != "" && strings.Contains(url, "api.github.com") {
 		req.Header.Add("Authorization", "token "+github.token)
 	}
 	req.Header.Add("User-Agent", github.userAgent)
