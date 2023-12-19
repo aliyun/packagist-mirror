@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.18.1 // indirect
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b // indirect
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.4
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 )
